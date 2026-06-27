@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Simplifi AI — Design System
+   White-major, enterprise, clean. One accent color.
+   ============================================================ */
+
+@theme {
+  /* Surfaces */
+  --color-canvas: #ffffff;
+  --color-surface: #f8fafc;
+  --color-surface-2: #f1f5f9;
+
+  /* Ink */
+  --color-ink: #0f172a;
+  --color-ink-soft: #334155;
+  --color-muted: #64748b;
+
+  /* Lines */
+  --color-line: #e2e8f0;
+  --color-line-soft: #eef2f6;
+
+  /* Brand accent — deep, trustworthy indigo-blue */
+  --color-brand: #2563eb;
+  --color-brand-dark: #1d4ed8;
+  --color-brand-soft: #eff4ff;
+
+  /* Status */
+  --color-success: #059669;
+
+  /* Type */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Radii */
+  --radius-sm: 0.5rem;
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-brand);
+  color: #fff;
+}
+
+/* Subtle dotted grid hero backdrop */
+.bg-grid {
+  background-image: radial-gradient(circle at 1px 1px, var(--color-line) 1px, transparent 0);
+  background-size: 28px 28px;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-rise {
+  animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
