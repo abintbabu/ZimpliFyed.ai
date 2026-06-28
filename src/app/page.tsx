@@ -2,11 +2,10 @@ import { Hero } from "@/components/home/hero";
 import {
   TrustStrip,
   Problem,
+  AILayer,
   Suite,
-  Connected,
   Solutions,
   Why,
-  AILayer,
   Security,
   Pricing,
   FinalCTA,
@@ -18,11 +17,10 @@ export default function Home() {
       <Hero />
       <TrustStrip />
       <Problem />
+      <AILayer />
       <Suite />
-      <Connected />
       <Solutions />
       <Why />
-      <AILayer />
       <Security />
       <Pricing />
       <FinalCTA />

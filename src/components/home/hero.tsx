@@ -1,30 +1,42 @@
 import { Container, Button, Eyebrow } from "@/components/ui";
+import { heroDemo } from "@/lib/content";
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden border-b border-line bg-white">
-      <div className="bg-grid absolute inset-0 opacity-60" aria-hidden />
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/40 to-transparent" />
+    <section className="relative overflow-hidden border-b border-line bg-surface">
+      {/* Ambient sunset aura + floating orbs */}
+      <div className="glow-sunset pointer-events-none absolute inset-0" aria-hidden />
+      <div
+        className="animate-float pointer-events-none absolute -left-20 top-10 h-72 w-72 rounded-full bg-amber/20 blur-3xl"
+        aria-hidden
+      />
+      <div
+        className="animate-float pointer-events-none absolute -right-16 top-40 h-80 w-80 rounded-full bg-violet/20 blur-3xl"
+        style={{ animationDelay: "2.5s" }}
+        aria-hidden
+      />
+
       <Container className="relative py-20 sm:py-28">
         <div className="mx-auto max-w-3xl text-center animate-rise">
           <Eyebrow>
             <span className="h-1.5 w-1.5 rounded-full bg-success" />
-            Built for Export · Import · B2B Trade · Manufacturing
+            The AI-first operating system for founders
           </Eyebrow>
           <h1 className="mt-6 text-4xl font-semibold leading-[1.1] tracking-tight text-ink sm:text-6xl">
-            The complete operating system for founders
+            Run your entire company by{" "}
+            <span className="text-gradient">simply asking</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink-soft sm:text-xl">
-            Stop comparing tools, decoding pricing tiers and stitching software
-            together. Simplifi bundles the best CRM, ERP, HRMS, Payroll, Orders
-            and Inventory — pre-integrated, so you can just run your business.
+            CRM, ERP, HR, Payroll, Orders, Inventory — one pre-integrated suite
+            where every app is AI-powered. Chat with Simplifi and it completes any
+            complex action in under two minutes.
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button href="/demo" className="px-6 py-3 text-base">
-              Book a demo
+            <Button href="/signup" variant="gradient" className="px-6 py-3 text-base">
+              Start free
             </Button>
-            <Button href="/signup" variant="secondary" className="px-6 py-3 text-base">
-              Get started free
+            <Button href="/demo" variant="secondary" className="px-6 py-3 text-base">
+              Watch it work
             </Button>
           </div>
           <p className="mt-4 text-sm text-muted">
@@ -32,48 +44,75 @@ export function Hero() {
           </p>
         </div>
 
-        {/* Product window mock */}
-        <div className="mx-auto mt-16 max-w-5xl">
-          <div className="overflow-hidden rounded-xl border border-line bg-white shadow-[0_24px_60px_-30px_rgba(15,23,42,0.25)]">
-            <div className="flex items-center gap-2 border-b border-line bg-surface px-4 py-3">
-              <span className="h-3 w-3 rounded-full bg-line" />
-              <span className="h-3 w-3 rounded-full bg-line" />
-              <span className="h-3 w-3 rounded-full bg-line" />
-              <span className="ml-4 text-xs font-medium text-muted">
-                app.simplifi.ai · Dashboard
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-4 p-6 sm:grid-cols-4">
-              {[
-                ["Revenue", "$1.42M", "+12.4%"],
-                ["Open Orders", "318", "+6 today"],
-                ["In Production", "27", "4 due"],
-                ["Receivables", "$284K", "12 invoices"],
-              ].map(([label, value, meta]) => (
-                <div
-                  key={label}
-                  className="rounded-lg border border-line bg-surface/50 p-4"
-                >
-                  <p className="text-xs font-medium text-muted">{label}</p>
-                  <p className="mt-2 text-xl font-semibold text-ink">{value}</p>
-                  <p className="mt-1 text-xs text-success">{meta}</p>
-                </div>
-              ))}
-              <div className="col-span-3 mt-2 flex h-32 items-end gap-2 rounded-lg border border-line bg-surface/50 p-4 sm:col-span-4">
-                {[40, 65, 50, 80, 60, 95, 72, 88, 70, 100, 84, 92].map(
-                  (h, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 rounded-t bg-brand/80"
-                      style={{ height: `${h}%` }}
-                    />
-                  )
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+        <ChatMock />
       </Container>
     </section>
+  );
+}
+
+/* AI chat → action mock: prompt, working steps, finished action card. */
+function ChatMock() {
+  return (
+    <div className="mx-auto mt-16 max-w-3xl animate-rise" style={{ animationDelay: "0.15s" }}>
+      <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-[0_30px_70px_-35px_rgba(20,18,16,0.4)]">
+        {/* Window chrome */}
+        <div className="flex items-center gap-2 border-b border-line bg-surface px-4 py-3">
+          <span className="h-3 w-3 rounded-full bg-line" />
+          <span className="h-3 w-3 rounded-full bg-line" />
+          <span className="h-3 w-3 rounded-full bg-line" />
+          <span className="ml-3 text-xs font-medium text-muted">
+            app.simplifi.ai · Ask Simplifi
+          </span>
+        </div>
+
+        <div className="space-y-4 p-5 sm:p-6">
+          {/* User prompt */}
+          <div className="flex justify-end">
+            <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-ink px-4 py-2.5 text-sm text-white">
+              {heroDemo.prompt}
+            </p>
+          </div>
+
+          {/* AI working */}
+          <div className="flex items-start gap-3">
+            <span className="bg-sunset mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white">
+              S
+            </span>
+            <div className="w-full max-w-[85%] rounded-2xl rounded-bl-sm border border-line bg-surface px-4 py-3">
+              <p className="flex items-center gap-2 text-xs font-medium text-muted">
+                <span className="flex gap-1" aria-hidden>
+                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-coral" />
+                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-coral" style={{ animationDelay: "0.2s" }} />
+                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-coral" style={{ animationDelay: "0.4s" }} />
+                </span>
+                Working across 4 modules
+              </p>
+              <ul className="mt-3 space-y-2">
+                {heroDemo.steps.map((step) => (
+                  <li key={step} className="flex items-center gap-2 text-sm text-ink-soft">
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-success/15 text-[10px] text-success">
+                      ✓
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Result action card */}
+          <div className="border-gradient flex flex-col gap-3 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-ink">{heroDemo.result.title}</p>
+              <p className="mt-1 text-xs text-muted">{heroDemo.result.detail}</p>
+            </div>
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">
+              <span className="h-1.5 w-1.5 rounded-full bg-success" />
+              {heroDemo.result.time}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

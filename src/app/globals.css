@@ -2,28 +2,34 @@
 
 /* ============================================================
    Simplifi AI — Design System
-   White-major, enterprise, clean. One accent color.
+   White-major, enterprise, Apple-inspired restraint.
+   Warm "sunset" multi-hue accents: amber · coral · violet.
    ============================================================ */
 
 @theme {
-  /* Surfaces */
+  /* Surfaces — white-major, warm off-whites */
   --color-canvas: #ffffff;
-  --color-surface: #f8fafc;
-  --color-surface-2: #f1f5f9;
+  --color-surface: #fffbf7;
+  --color-surface-2: #fbefe6;
 
-  /* Ink */
-  --color-ink: #0f172a;
-  --color-ink-soft: #334155;
-  --color-muted: #64748b;
+  /* Ink — warm near-black */
+  --color-ink: #141210;
+  --color-ink-soft: #44403a;
+  --color-muted: #78716a;
 
-  /* Lines */
-  --color-line: #e2e8f0;
-  --color-line-soft: #eef2f6;
+  /* Lines — warm neutrals */
+  --color-line: #ece5dd;
+  --color-line-soft: #f4eee7;
 
-  /* Brand accent — deep, trustworthy indigo-blue */
-  --color-brand: #2563eb;
-  --color-brand-dark: #1d4ed8;
-  --color-brand-soft: #eff4ff;
+  /* Sunset accents */
+  --color-amber: #ffb020;
+  --color-coral: #ff5e7e;
+  --color-violet: #7c6cff;
+
+  /* Brand = coral primary (aliases keep existing utilities warm) */
+  --color-brand: #ff5e7e;
+  --color-brand-dark: #f0426a;
+  --color-brand-soft: #fff0f3;
 
   /* Status */
   --color-success: #059669;
@@ -36,6 +42,10 @@
   --radius-sm: 0.5rem;
   --radius: 0.75rem;
   --radius-lg: 1rem;
+}
+
+:root {
+  --gradient-sunset: linear-gradient(100deg, #ffb020, #ff5e7e 55%, #7c6cff);
 }
 
 * {
@@ -55,20 +65,92 @@ body {
 }
 
 ::selection {
-  background: var(--color-brand);
+  background: var(--color-coral);
   color: #fff;
 }
 
-/* Subtle dotted grid hero backdrop */
+/* ---------- Sunset utilities ---------- */
+.bg-sunset {
+  background-image: var(--gradient-sunset);
+}
+
+.text-gradient {
+  background-image: var(--gradient-sunset);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.border-gradient {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    var(--gradient-sunset) border-box;
+}
+
+/* Soft warm aura behind hero / product */
+.glow-sunset {
+  background: radial-gradient(
+    60% 60% at 50% 35%,
+    rgba(255, 176, 32, 0.18),
+    rgba(255, 94, 126, 0.14) 45%,
+    rgba(124, 108, 255, 0.1) 70%,
+    transparent 100%
+  );
+}
+
+/* Subtle dotted grid backdrop */
 .bg-grid {
   background-image: radial-gradient(circle at 1px 1px, var(--color-line) 1px, transparent 0);
   background-size: 28px 28px;
 }
 
+/* ---------- Motion ---------- */
 @keyframes rise {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-rise {
   animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(0, -22px, 0); }
+}
+.animate-float {
+  animation: float 9s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-line-soft) 37%,
+    var(--color-surface-2) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50%      { opacity: 1; transform: scale(1); }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-float,
+  .animate-shimmer,
+  .animate-pulse-dot {
+    animation: none;
+  }
+  html { scroll-behavior: auto; }
 }
