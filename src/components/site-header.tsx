@@ -7,11 +7,11 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-line bg-white/80 backdrop-blur">
       <Container className="flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <span className="bg-sunset flex h-7 w-7 items-center justify-center rounded-md text-sm font-bold text-white">
+          <span className="bg-brand-gradient flex h-7 w-7 items-center justify-center rounded-md text-sm font-bold text-white">
             S
           </span>
           <span className="text-[15px] font-semibold tracking-tight text-ink">
-            Simplifi<span className="text-gradient"> AI</span>
+            Simplifi<span className="text-brand"> AI</span>
           </span>
         </Link>
 

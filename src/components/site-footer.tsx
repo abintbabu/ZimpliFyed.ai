@@ -27,11 +27,11 @@ export function SiteFooter() {
         <div className="grid gap-10 md:grid-cols-[1.5fr_repeat(4,1fr)]">
           <div>
             <div className="flex items-center gap-2">
-              <span className="bg-sunset flex h-7 w-7 items-center justify-center rounded-md text-sm font-bold text-white">
+              <span className="bg-brand-gradient flex h-7 w-7 items-center justify-center rounded-md text-sm font-bold text-white">
                 S
               </span>
               <span className="text-[15px] font-semibold tracking-tight text-ink">
-                Simplifi<span className="text-gradient"> AI</span>
+                Simplifi<span className="text-brand"> AI</span>
               </span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">

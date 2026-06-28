@@ -9,7 +9,7 @@ export function TrustStrip() {
         <p className="text-center text-xs font-medium uppercase tracking-wider text-muted">
           Trusted by founders running real operations
         </p>
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-12 gap-y-4 opacity-70">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-12 gap-y-4 opacity-60">
           {["NorthPort", "Veda Mills", "Acme Trade Co", "Lumen Exports", "Kraft & Co", "Meridian"].map(
             (name) => (
               <span key={name} className="text-base font-semibold text-ink-soft">
@@ -37,7 +37,7 @@ export function Problem() {
               sub="Choosing a CRM. Comparing ERP plans. Wiring payroll into accounting. Every tool speaks a different language and nothing reconciles. That's time you don't have."
             />
           </div>
-          <div className="rounded-2xl border border-line bg-white p-8 shadow-[0_20px_50px_-30px_rgba(20,18,16,0.3)]">
+          <div className="rounded-2xl border border-line bg-white p-8 shadow-[0_20px_50px_-30px_rgba(15,23,42,0.22)]">
             <div className="flex flex-wrap gap-2">
               {["CRM", "Accounting", "Payroll", "Inventory", "HR", "Orders", "Procurement", "Reporting"].map(
                 (t) => (
@@ -55,8 +55,8 @@ export function Problem() {
               becomes
               <div className="h-px flex-1 bg-line" />
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-coral/20 bg-brand-soft px-4 py-4">
-              <span className="bg-sunset flex h-9 w-9 items-center justify-center rounded-md text-sm font-bold text-white">
+            <div className="flex items-center gap-3 rounded-xl border border-brand/20 bg-brand-soft px-4 py-4">
+              <span className="bg-brand-gradient flex h-9 w-9 items-center justify-center rounded-md text-sm font-bold text-white">
                 S
               </span>
               <div>
@@ -83,7 +83,7 @@ export function AILayer() {
 
   return (
     <section className="relative overflow-hidden border-b border-line bg-white py-20 sm:py-28">
-      <div className="glow-sunset pointer-events-none absolute inset-x-0 top-0 h-64" aria-hidden />
+      <div className="glow-brand pointer-events-none absolute inset-x-0 top-0 h-64" aria-hidden />
       <Container className="relative">
         <SectionHeading
           center
@@ -96,7 +96,7 @@ export function AILayer() {
           {items.map(([t, d]) => (
             <div
               key={t}
-              className="rounded-2xl border border-line bg-surface/60 p-6 transition-all hover:-translate-y-0.5 hover:border-coral/30 hover:shadow-[0_16px_40px_-24px_rgba(255,94,126,0.5)]"
+              className="rounded-2xl border border-line bg-surface/60 p-6 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-[0_16px_40px_-24px_rgba(29,78,216,0.35)]"
             >
               <h3 className="text-base font-semibold text-ink">{t}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">{d}</p>
@@ -104,7 +104,7 @@ export function AILayer() {
           ))}
         </div>
 
-        {/* One action flows through every module */}
+        {/* Flow diagram */}
         <div className="mt-16 rounded-2xl border border-line bg-surface/50 p-8">
           <p className="text-center text-sm font-medium text-ink-soft">
             One action flows through every module — automatically
@@ -116,7 +116,7 @@ export function AILayer() {
                   {step}
                 </div>
                 {i < flow.length - 1 && (
-                  <span className="text-coral" aria-hidden>
+                  <span className="text-brand" aria-hidden>
                     →
                   </span>
                 )}
@@ -145,9 +145,9 @@ export function Suite() {
           {modules.map((m) => (
             <div
               key={m.name}
-              className="group rounded-2xl border border-line bg-white p-6 transition-all hover:-translate-y-0.5 hover:border-coral/40 hover:shadow-[0_16px_40px_-22px_rgba(255,94,126,0.5)]"
+              className="group rounded-2xl border border-line bg-white p-6 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-[0_16px_40px_-22px_rgba(29,78,216,0.35)]"
             >
-              <div className="bg-sunset flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white">
+              <div className="bg-brand-gradient flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white">
                 {m.name.slice(0, 2)}
               </div>
               <h3 className="mt-4 text-base font-semibold text-ink">{m.name}</h3>
@@ -175,9 +175,9 @@ export function Solutions() {
           {industries.map((ind) => (
             <div
               key={ind.slug}
-              className="rounded-2xl border border-line bg-white p-7 transition-all hover:-translate-y-0.5 hover:border-coral/40 hover:shadow-[0_16px_40px_-26px_rgba(255,94,126,0.45)]"
+              className="rounded-2xl border border-line bg-white p-7 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-[0_16px_40px_-26px_rgba(29,78,216,0.3)]"
             >
-              <p className="text-xs font-semibold uppercase tracking-wider text-coral">
+              <p className="text-xs font-semibold uppercase tracking-wider text-brand">
                 {ind.name}
               </p>
               <h3 className="mt-2 text-xl font-semibold text-ink">{ind.headline}</h3>
@@ -227,7 +227,7 @@ export function Why() {
             <div key={label} className="grid grid-cols-3 border-b border-line text-sm last:border-0">
               <div className="p-4 font-medium text-ink">{label}</div>
               <div className="p-4 text-muted">{diy}</div>
-              <div className="bg-brand-soft/40 p-4 font-medium text-ink">{simplifi}</div>
+              <div className="bg-brand-soft/50 p-4 font-medium text-ink">{simplifi}</div>
             </div>
           ))}
         </div>
@@ -276,7 +276,7 @@ export function Pricing() {
           highlight="One price."
           sub="No per-tool licensing, no surprise tiers. Everything included, scaling with your team."
         />
-        <div className="border-gradient mx-auto mt-12 max-w-md rounded-2xl p-8 shadow-[0_30px_70px_-35px_rgba(255,94,126,0.6)]">
+        <div className="border-gradient mx-auto mt-12 max-w-md rounded-2xl p-8 shadow-[0_30px_70px_-35px_rgba(29,78,216,0.45)]">
           <p className="text-sm font-semibold text-gradient">Simplifi Suite</p>
           <p className="mt-3 text-4xl font-semibold text-ink">
             $—<span className="text-base font-normal text-muted"> /seat / month</span>
@@ -308,13 +308,22 @@ export function FinalCTA() {
   return (
     <section className="bg-white py-20 sm:py-28">
       <Container>
-        <div className="bg-sunset relative overflow-hidden rounded-3xl px-8 py-16 text-center sm:px-16">
+        <div className="relative overflow-hidden rounded-3xl bg-ink px-8 py-16 text-center sm:px-16">
+          {/* Subtle brand aura on the dark bg */}
+          <div
+            className="pointer-events-none absolute inset-0 rounded-3xl"
+            style={{
+              background:
+                "radial-gradient(ellipse 70% 60% at 50% 0%, rgba(29,78,216,0.35), transparent 70%)",
+            }}
+            aria-hidden
+          />
           <div className="bg-grid absolute inset-0 opacity-10" aria-hidden />
           <div className="relative">
             <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">
               Found your company the easy way
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-lg text-white/85">
+            <p className="mx-auto mt-4 max-w-xl text-lg text-white/75">
               One AI-powered suite that runs export, import, trade and
               manufacturing. Describe what you need — Simplifi does the rest.
             </p>
@@ -327,7 +336,7 @@ export function FinalCTA() {
               </Button>
               <Button
                 href="/demo"
-                className="border border-white/40 bg-transparent px-6 py-3 text-base text-white hover:bg-white/10"
+                className="border border-white/30 bg-transparent px-6 py-3 text-base text-white hover:bg-white/10"
               >
                 Book a demo
               </Button>

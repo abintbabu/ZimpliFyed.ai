@@ -7,7 +7,7 @@ export function GoogleSignInButton({ label = "Continue with Google" }: { label?:
     <button
       type="button"
       onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-      className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-white px-5 py-3 text-sm font-medium text-ink transition-all hover:-translate-y-0.5 hover:border-coral/30 hover:shadow-[0_12px_30px_-16px_rgba(20,18,16,0.25)] active:translate-y-0"
+      className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-white px-5 py-3 text-sm font-medium text-ink transition-all hover:-translate-y-0.5 hover:border-brand/25 hover:shadow-[0_10px_28px_-14px_rgba(15,23,42,0.22)] active:translate-y-0"
     >
       <GoogleIcon />
       {label}

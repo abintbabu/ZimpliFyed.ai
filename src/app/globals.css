@@ -2,34 +2,33 @@
 
 /* ============================================================
    Simplifi AI — Design System
-   White-major, enterprise, Apple-inspired restraint.
-   Warm "sunset" multi-hue accents: amber · coral · violet.
+   White-major, Apple-inspired enterprise.
+   Cool indigo-navy-sky accent palette — trusted globally.
    ============================================================ */
 
 @theme {
-  /* Surfaces — white-major, warm off-whites */
+  /* Surfaces — crisp, clean cool whites */
   --color-canvas: #ffffff;
-  --color-surface: #fffbf7;
-  --color-surface-2: #fbefe6;
+  --color-surface: #f8fafc;
+  --color-surface-2: #f1f5f9;
 
-  /* Ink — warm near-black */
-  --color-ink: #141210;
-  --color-ink-soft: #44403a;
-  --color-muted: #78716a;
+  /* Ink — cool near-black */
+  --color-ink: #0f172a;
+  --color-ink-soft: #334155;
+  --color-muted: #64748b;
 
-  /* Lines — warm neutrals */
-  --color-line: #ece5dd;
-  --color-line-soft: #f4eee7;
+  /* Lines */
+  --color-line: #e2e8f0;
+  --color-line-soft: #f1f5f9;
 
-  /* Sunset accents */
-  --color-amber: #ffb020;
-  --color-coral: #ff5e7e;
-  --color-violet: #7c6cff;
+  /* Brand — deep indigo, trustworthy, globally recognised */
+  --color-brand: #1d4ed8;
+  --color-brand-dark: #1e3a8a;
+  --color-brand-soft: #eff6ff;
+  --color-brand-mid: #2563eb;
 
-  /* Brand = coral primary (aliases keep existing utilities warm) */
-  --color-brand: #ff5e7e;
-  --color-brand-dark: #f0426a;
-  --color-brand-soft: #fff0f3;
+  /* Sky accent — AI/tech energy without warmth */
+  --color-sky: #0ea5e9;
 
   /* Status */
   --color-success: #059669;
@@ -45,7 +44,8 @@
 }
 
 :root {
-  --gradient-sunset: linear-gradient(100deg, #ffb020, #ff5e7e 55%, #7c6cff);
+  /* Deep navy → indigo → sky — cool, trustworthy, technological */
+  --gradient-brand: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #0ea5e9 100%);
 }
 
 * {
@@ -65,17 +65,17 @@ body {
 }
 
 ::selection {
-  background: var(--color-coral);
+  background: var(--color-brand);
   color: #fff;
 }
 
-/* ---------- Sunset utilities ---------- */
-.bg-sunset {
-  background-image: var(--gradient-sunset);
+/* ---------- Brand gradient utilities ---------- */
+.bg-brand-gradient {
+  background-image: var(--gradient-brand);
 }
 
 .text-gradient {
-  background-image: var(--gradient-sunset);
+  background-image: var(--gradient-brand);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -85,16 +85,16 @@ body {
   border: 1px solid transparent;
   background:
     linear-gradient(#fff, #fff) padding-box,
-    var(--gradient-sunset) border-box;
+    var(--gradient-brand) border-box;
 }
 
-/* Soft warm aura behind hero / product */
-.glow-sunset {
+/* Subtle indigo aura — conveys depth, not warmth */
+.glow-brand {
   background: radial-gradient(
-    60% 60% at 50% 35%,
-    rgba(255, 176, 32, 0.18),
-    rgba(255, 94, 126, 0.14) 45%,
-    rgba(124, 108, 255, 0.1) 70%,
+    65% 55% at 50% 30%,
+    rgba(29, 78, 216, 0.10),
+    rgba(37, 99, 235, 0.07) 50%,
+    rgba(14, 165, 233, 0.05) 75%,
     transparent 100%
   );
 }
@@ -116,10 +116,10 @@ body {
 
 @keyframes float {
   0%, 100% { transform: translate3d(0, 0, 0); }
-  50%      { transform: translate3d(0, -22px, 0); }
+  50%      { transform: translate3d(0, -20px, 0); }
 }
 .animate-float {
-  animation: float 9s ease-in-out infinite;
+  animation: float 10s ease-in-out infinite;
 }
 
 @keyframes shimmer {

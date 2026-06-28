@@ -3,16 +3,17 @@ import { heroDemo } from "@/lib/content";
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden border-b border-line bg-surface">
-      {/* Ambient sunset aura + floating orbs */}
-      <div className="glow-sunset pointer-events-none absolute inset-0" aria-hidden />
+    <section className="relative overflow-hidden border-b border-line bg-white">
+      {/* Subtle indigo aura */}
+      <div className="glow-brand pointer-events-none absolute inset-0" aria-hidden />
+      {/* Floating orbs — cool indigo/sky tones */}
       <div
-        className="animate-float pointer-events-none absolute -left-20 top-10 h-72 w-72 rounded-full bg-amber/20 blur-3xl"
+        className="animate-float pointer-events-none absolute -left-24 top-8 h-80 w-80 rounded-full bg-brand/8 blur-3xl"
         aria-hidden
       />
       <div
-        className="animate-float pointer-events-none absolute -right-16 top-40 h-80 w-80 rounded-full bg-violet/20 blur-3xl"
-        style={{ animationDelay: "2.5s" }}
+        className="animate-float pointer-events-none absolute -right-20 top-32 h-96 w-96 rounded-full bg-sky/8 blur-3xl"
+        style={{ animationDelay: "3s" }}
         aria-hidden
       />
 
@@ -50,11 +51,10 @@ export function Hero() {
   );
 }
 
-/* AI chat → action mock: prompt, working steps, finished action card. */
 function ChatMock() {
   return (
     <div className="mx-auto mt-16 max-w-3xl animate-rise" style={{ animationDelay: "0.15s" }}>
-      <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-[0_30px_70px_-35px_rgba(20,18,16,0.4)]">
+      <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-[0_30px_70px_-35px_rgba(15,23,42,0.35)]">
         {/* Window chrome */}
         <div className="flex items-center gap-2 border-b border-line bg-surface px-4 py-3">
           <span className="h-3 w-3 rounded-full bg-line" />
@@ -75,15 +75,15 @@ function ChatMock() {
 
           {/* AI working */}
           <div className="flex items-start gap-3">
-            <span className="bg-sunset mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white">
+            <span className="bg-brand-gradient mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white">
               S
             </span>
             <div className="w-full max-w-[85%] rounded-2xl rounded-bl-sm border border-line bg-surface px-4 py-3">
               <p className="flex items-center gap-2 text-xs font-medium text-muted">
                 <span className="flex gap-1" aria-hidden>
-                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-coral" />
-                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-coral" style={{ animationDelay: "0.2s" }} />
-                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-coral" style={{ animationDelay: "0.4s" }} />
+                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-brand" />
+                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-brand" style={{ animationDelay: "0.2s" }} />
+                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-brand" style={{ animationDelay: "0.4s" }} />
                 </span>
                 Working across 4 modules
               </p>
