@@ -1,0 +1,530 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Tenancy ──────────────────────────────────────────────────────────────
+
+enum TenantPlan {
+  free
+  starter
+  growth
+  enterprise
+}
+
+enum TenantStatus {
+  trial
+  active
+  past_due
+  suspended
+}
+
+model Tenant {
+  id     String       @id @default(cuid())
+  slug   String       @unique
+  name   String
+  plan   TenantPlan   @default(free)
+  status TenantStatus @default(trial)
+
+  logoUrl      String?
+  primaryColor String?
+
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+
+  memberships Membership[]
+  invites     Invite[]
+  leads       Lead[]
+  tasks       Task[]
+  auditLog    AuditEntry[]
+  vendors     Vendor[]
+  vendorRates VendorRate[]
+  quotes      Quote[]
+  invoices    Invoice[]
+  orders      Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Auth (next-auth PrismaAdapter models) ────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  accounts    Account[]
+  sessions    Session[]
+  memberships Membership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Membership (role-per-tenant; replaces Firebase custom claims) ────────
+
+enum MembershipRole {
+  customer
+  sales
+  finance
+  procurement
+  production
+  logistics
+  marketing
+  viewer
+  admin
+  super_admin
+  vendor
+}
+
+model Membership {
+  id       String         @id @default(cuid())
+  userId   String
+  tenantId String
+  role     MembershipRole
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
+/**
+ * A pending seat for an email that hasn't signed in yet. Consumed (Membership
+ * created, acceptedAt stamped) the next time that email completes Google sign-in.
+ */
+model Invite {
+  id       String         @id @default(cuid())
+  tenantId String
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email    String
+  role     MembershipRole
+
+  invitedByUserId String
+  acceptedAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, email])
+  @@index([email])
+}
+
+// ─── CRM core (first vertical slice) ───────────────────────────────────────
+
+enum LeadSource {
+  whatsapp
+  inquiry
+  rfq
+  customer
+  manual
+  email
+}
+
+enum LeadStage {
+  New
+  Quoted_Invoice
+  Follow_Up
+  Sample_Requested
+  Insufficient_Info
+  In_Production
+  Shipped
+  Lost
+}
+
+enum LeadQuality {
+  Strong
+  Medium
+  Weak
+  Unrated
+}
+
+model Lead {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  source LeadSource
+
+  name            String
+  company         String?
+  email           String?
+  phone           String?
+  country         String?
+  itemsInterested String?
+  currentStatus   String?
+  nextSteps       String?
+  notes           String?
+  stage           LeadStage   @default(New)
+  quality         LeadQuality @default(Unrated)
+  leadNumber      Int?
+  nextFollowUpAt  DateTime?
+
+  assignedToUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, stage])
+  @@index([tenantId, leadNumber])
+}
+
+// ─── Vendors ──────────────────────────────────────────────────────────────
+
+enum VendorRateMethod {
+  per_piece
+  per_kg
+  per_metre
+}
+
+model Vendor {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  bankDetails String?
+
+  rates VendorRate[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model VendorRate {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  sku         String
+  description String?
+  method      VendorRateMethod
+  baseRate    Float
+
+  normalizedPieceCost Float?
+  moqPieces           Int?
+  leadTimeDays        Int?
+  isPreferred         Boolean @default(false)
+
+  tiers VendorRateTier[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, vendorId])
+  @@index([tenantId, sku])
+}
+
+model VendorRateTier {
+  id           String     @id @default(cuid())
+  vendorRateId String
+  vendorRate   VendorRate @relation(fields: [vendorRateId], references: [id], onDelete: Cascade)
+
+  minQty Int
+  rate   Float
+
+  @@index([vendorRateId])
+}
+
+// ─── Quotes ─────────────────────────────────────────────────────────────
+
+enum QuoteStatus {
+  draft
+  sent
+  accepted
+  declined
+  expired
+}
+
+model Quote {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  quoteNumber String
+  leadId      String?
+  status      QuoteStatus @default(draft)
+
+  currency         String @default("USD")
+  total            Float  @default(0)
+  overallMarginPct Float?
+
+  orderId String? @unique
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  lines QuoteLineItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, leadId])
+}
+
+model QuoteLineItem {
+  id      String @id @default(cuid())
+  quoteId String
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  description String
+  quantity    Float
+  cost        Float
+  expensePct  Float
+  marginPct   Float
+  unitPrice   Float
+  lineTotal   Float
+
+  @@index([quoteId])
+}
+
+// ─── Invoices ───────────────────────────────────────────────────────────
+
+enum InvoiceStatus {
+  draft
+  sent
+  paid
+  partially_paid
+  overdue
+  void
+}
+
+model Invoice {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  invoiceNumber String
+  orderId       String?
+  order         Order?        @relation(fields: [orderId], references: [id])
+  status        InvoiceStatus @default(draft)
+
+  currency            String    @default("USD")
+  total               Float     @default(0)
+  balanceDue          Float     @default(0)
+  dueDate             DateTime?
+  isCreditOrDebitNote Boolean   @default(false)
+
+  lines InvoiceLineItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, orderId])
+}
+
+model InvoiceLineItem {
+  id        String  @id @default(cuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  description String
+  quantity    Float
+  cost        Float
+  expensePct  Float
+  marginPct   Float
+  unitPrice   Float
+  lineTotal   Float
+
+  @@index([invoiceId])
+}
+
+// ─── Orders ─────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  confirmed
+  in_production
+  shipped
+  in_transit
+  delivered
+  cancelled
+}
+
+model Order {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  orderNumber String
+  status      OrderStatus @default(confirmed)
+
+  product     String?
+  quantity    Float?
+  unit        String?
+  incoterm    String?
+  destination String?
+  originPort  String?
+  destPort    String?
+
+  quote       Quote?
+  invoices    Invoice[]
+  buyerTracks OrderBuyerTrack[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+}
+
+model OrderBuyerTrack {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  token  String  @unique
+  active Boolean @default(true)
+
+  createdByUserId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+}
+
+// ─── Tasks ──────────────────────────────────────────────────────────────
+
+enum TaskPriority {
+  low
+  medium
+  high
+}
+
+enum TaskStatus {
+  open
+  in_progress
+  done
+  cancelled
+}
+
+enum TaskLinkedType {
+  order
+  customer
+  invoice
+  general
+}
+
+model Task {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  priority    TaskPriority
+  status      TaskStatus   @default(open)
+
+  assigneeUserId String
+  assigneeName   String
+  assigneeRole   MembershipRole
+
+  linkedType  TaskLinkedType @default(general)
+  linkedId    String?
+  linkedLabel String?
+  dueDate     DateTime?
+
+  createdByUserId String
+  completedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, assigneeUserId])
+}
+
+// ─── Audit log ──────────────────────────────────────────────────────────
+
+enum AuditAction {
+  create
+  update
+  delete
+  status_change
+  assign
+  login
+  logout
+  upload
+  download
+  send_email
+  mark_paid
+  mark_unpaid
+  role_change
+  pricing_change
+}
+
+model AuditEntry {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  collection String
+  documentId String
+  action     AuditAction
+  summary    String
+
+  actorUserId String
+  actorEmail  String
+  actorRole   MembershipRole?
+
+  beforeJson String?
+  afterJson  String?
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, collection, documentId])
+  @@index([tenantId, createdAt])
+}
