@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
+import { writeAudit } from '@/lib/audit';
 import {
   withDefaultExpenseMargin,
   marginPctFromCostExpensePrice,
@@ -46,7 +47,8 @@ export async function getQuote(tenantId: string, quoteId: string) {
 }
 
 export async function createQuote(input: { quoteNumber: string; leadId?: string; currency?: string; lines: QuoteLineInput[] }) {
-  const { tenantId, role } = await requireTenantSession();
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
   if (!hasPermission(role, 'quotes:write')) throw new Error('You do not have permission to create quotes');
 
   const { lines, total, overallMarginPct } = buildLineTotals(input.lines);
@@ -63,15 +65,39 @@ export async function createQuote(input: { quoteNumber: string; leadId?: string;
     },
   });
 
+  await writeAudit({
+    session,
+    collection: 'quotes',
+    documentId: quote.id,
+    action: 'create',
+    summary: `Created quote ${quote.quoteNumber}`,
+    after: { quoteNumber: quote.quoteNumber, total: quote.total, currency: quote.currency },
+  });
+
   revalidatePath('/dashboard/quotes');
   return quote;
 }
 
 export async function updateQuoteStatus(quoteId: string, status: QuoteStatus) {
-  const { tenantId, role } = await requireTenantSession();
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
   if (!hasPermission(role, 'quotes:write')) throw new Error('You do not have permission to update quotes');
 
+  const before = await prisma.quote.findFirst({ where: { id: quoteId, tenantId } });
+  if (!before) throw new Error('Quote not found');
+
   await prisma.quote.update({ where: { id: quoteId, tenantId }, data: { status } });
+
+  await writeAudit({
+    session,
+    collection: 'quotes',
+    documentId: quoteId,
+    action: 'status_change',
+    summary: `Quote ${before.quoteNumber} status: ${before.status} -> ${status}`,
+    before: { status: before.status },
+    after: { status },
+  });
+
   revalidatePath('/dashboard/quotes');
   revalidatePath(`/dashboard/quotes/${quoteId}`);
 }

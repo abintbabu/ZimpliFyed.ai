@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
+import { writeAudit } from '@/lib/audit';
 import type { OrderStatus } from '@prisma/client';
 
 export async function listOrders(tenantId: string) {
@@ -31,7 +32,8 @@ export async function createOrderFromQuote(quoteId: string, input: {
   originPort?: string;
   destPort?: string;
 }) {
-  const { tenantId, role } = await requireTenantSession();
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
   if (!hasPermission(role, 'orders:write')) throw new Error('You do not have permission to create orders');
 
   const quote = await prisma.quote.findFirst({ where: { id: quoteId, tenantId } });
@@ -53,16 +55,40 @@ export async function createOrderFromQuote(quoteId: string, input: {
     },
   });
 
+  await writeAudit({
+    session,
+    collection: 'orders',
+    documentId: order.id,
+    action: 'create',
+    summary: `Created order ${order.orderNumber} from quote ${quote.quoteNumber}`,
+    after: { orderNumber: order.orderNumber, quoteId },
+  });
+
   revalidatePath('/dashboard/orders');
   revalidatePath('/dashboard/quotes');
   return order;
 }
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus) {
-  const { tenantId, role } = await requireTenantSession();
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
   if (!hasPermission(role, 'orders:write')) throw new Error('You do not have permission to update orders');
 
+  const before = await prisma.order.findFirst({ where: { id: orderId, tenantId } });
+  if (!before) throw new Error('Order not found');
+
   await prisma.order.update({ where: { id: orderId, tenantId }, data: { status } });
+
+  await writeAudit({
+    session,
+    collection: 'orders',
+    documentId: orderId,
+    action: 'status_change',
+    summary: `Order ${before.orderNumber} status: ${before.status} -> ${status}`,
+    before: { status: before.status },
+    after: { status },
+  });
+
   revalidatePath('/dashboard/orders');
   revalidatePath(`/dashboard/orders/${orderId}`);
 }

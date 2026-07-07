@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getBuyerTrackByToken } from '@/actions/order-track';
+import { MILESTONE_ORDER, MILESTONE_LABELS } from '@/lib/shipment-milestones';
 
 export default async function BuyerTrackPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -25,6 +26,27 @@ export default async function BuyerTrackPage({ params }: { params: Promise<{ tok
           <div><p className="text-xs text-muted">Origin port</p><p className="text-ink">{data.originPort ?? '—'}</p></div>
           <div><p className="text-xs text-muted">Destination port</p><p className="text-ink">{data.destPort ?? '—'}</p></div>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-white p-4">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">Shipment timeline</p>
+        <ol className="space-y-3">
+          {MILESTONE_ORDER.map((type) => {
+            const m = data.milestones.find((ms) => ms.type === type);
+            const reached = !!m?.actualAt;
+            const date = m?.actualAt ?? m?.plannedAt;
+            return (
+              <li key={type} className="flex items-center gap-3 text-sm">
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${reached ? 'bg-green-600' : 'bg-line'}`} />
+                <span className="flex-1 text-ink">{MILESTONE_LABELS[type]}</span>
+                <span className="text-xs text-muted">
+                  {date ? new Date(date).toLocaleDateString() : '—'}
+                  {!reached && m?.plannedAt && ' (planned)'}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       </div>
     </div>
   );

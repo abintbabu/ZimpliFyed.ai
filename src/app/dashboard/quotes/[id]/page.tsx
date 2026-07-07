@@ -2,8 +2,10 @@ import { notFound } from 'next/navigation';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { getQuote } from '@/actions/quotes';
+import { getCostSheet } from '@/actions/cost-sheets';
 import { prisma } from '@/lib/prisma';
 import { DealRail } from '@/components/deal-rail';
+import { CostSheetPanel } from '@/components/cost-sheet-panel';
 import { QuoteActions } from './quote-actions';
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -18,6 +20,10 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
 
   const order = quote.orderId ? await prisma.order.findFirst({ where: { id: quote.orderId, tenantId } }) : null;
   const invoice = order ? await prisma.invoice.findFirst({ where: { orderId: order.id, tenantId } }) : null;
+  const costSheet = await getCostSheet(tenantId, quote.id);
+  const avgUnitPrice = quote.lines.length
+    ? quote.lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0) / quote.lines.reduce((sum, l) => sum + l.quantity, 0)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -62,6 +68,21 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
           Total: {quote.currency} {quote.total.toFixed(2)}
         </div>
       </div>
+
+      <CostSheetPanel
+        quoteId={quote.id}
+        canWrite={hasPermission(role, 'quotes:write')}
+        initial={
+          costSheet
+            ? {
+                incoterm: costSheet.incoterm,
+                sellPricePerUnit: costSheet.sellPricePerUnit,
+                rodtepPct: costSheet.rodtepPct,
+                lines: costSheet.lines,
+              }
+            : { incoterm: 'FOB', sellPricePerUnit: avgUnitPrice, rodtepPct: 0, lines: [] }
+        }
+      />
     </div>
   );
 }

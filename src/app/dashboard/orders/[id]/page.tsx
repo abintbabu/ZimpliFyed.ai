@@ -2,7 +2,17 @@ import { notFound } from 'next/navigation';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { getOrder } from '@/actions/orders';
+import { listDocuments } from '@/actions/documents';
+import { listExportDocuments } from '@/actions/export-documents';
+import { listShipmentMilestones } from '@/actions/shipment-milestones';
+import { listLettersOfCredit } from '@/actions/letters-of-credit';
+import { getOrderPnl } from '@/actions/order-pnl';
 import { DealRail } from '@/components/deal-rail';
+import { DocumentPanel } from '@/components/document-panel';
+import { ExportDocumentsPanel } from '@/components/export-documents-panel';
+import { ShipmentTimelinePanel } from '@/components/shipment-timeline-panel';
+import { LcAdvisorPanel } from '@/components/lc-advisor-panel';
+import { OrderPnlPanel } from '@/components/order-pnl-panel';
 import { OrderStatusActions } from './order-status-actions';
 import { OrderBuyerTrackPanel } from './order-buyer-track';
 
@@ -17,6 +27,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   if (!order) notFound();
 
   const invoice = order.invoices[0] ?? null;
+  const documents = await listDocuments('orders', order.id);
+  const exportDocuments = await listExportDocuments(tenantId, order.id);
+  const milestones = await listShipmentMilestones(tenantId, order.id);
+  const letterOfCredits = await listLettersOfCredit(tenantId, order.id);
+  const pnl = await getOrderPnl(order.id);
 
   return (
     <div className="space-y-6">
@@ -38,6 +53,33 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       </div>
 
       <OrderBuyerTrackPanel orderId={order.id} tracks={order.buyerTracks} />
+
+      <OrderPnlPanel pnl={pnl} currency={order.quote?.currency ?? invoice?.currency ?? 'USD'} />
+
+      <ShipmentTimelinePanel
+        orderId={order.id}
+        initialMilestones={milestones}
+        canWrite={hasPermission(role, 'orders:write')}
+      />
+
+      <LcAdvisorPanel
+        orderId={order.id}
+        initialLcs={letterOfCredits}
+        canWrite={hasPermission(role, 'orders:write')}
+      />
+
+      <ExportDocumentsPanel
+        orderId={order.id}
+        initialDocs={exportDocuments}
+        canWrite={hasPermission(role, 'orders:write')}
+      />
+
+      <DocumentPanel
+        collection="orders"
+        documentId={order.id}
+        initialDocuments={documents}
+        canWrite={hasPermission(role, 'orders:write')}
+      />
     </div>
   );
 }

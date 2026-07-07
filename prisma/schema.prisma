@@ -42,9 +42,19 @@ model Tenant {
   auditLog    AuditEntry[]
   vendors     Vendor[]
   vendorRates VendorRate[]
+  vendorRfqs  VendorRfq[]
   quotes      Quote[]
   invoices    Invoice[]
   orders      Order[]
+  documents   Document[]
+  costSheets  CostSheet[]
+  exportDocuments ExportDocument[]
+  hsCodes     HsCode[]
+  complianceItems ComplianceItem[]
+  shipmentMilestones ShipmentMilestone[]
+  screeningChecks ScreeningCheck[]
+  lettersOfCredit LetterOfCredit[]
+  incentiveClaims IncentiveClaim[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -233,7 +243,9 @@ model Vendor {
   phone       String?
   bankDetails String?
 
-  rates VendorRate[]
+  rates       VendorRate[]
+  rfqInvites  VendorRfqInvite[]
+  rfqQuotes   VendorRfqQuote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -279,6 +291,75 @@ model VendorRateTier {
   @@index([vendorRateId])
 }
 
+// ─── Vendor RFQs (broadcast to shortlisted vendors, compare, award) ──────
+
+enum VendorRfqStatus {
+  open
+  awarded
+  closed
+}
+
+model VendorRfq {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  rfqNumber   String
+  title       String
+  description String?
+  quantity    Float?
+  unit        String?
+  targetPrice Float?
+  dueDate     DateTime?
+  status      VendorRfqStatus @default(open)
+
+  awardedQuoteId String?      @unique
+  awardedQuote   VendorRfqQuote? @relation("AwardedQuote", fields: [awardedQuoteId], references: [id])
+
+  invites VendorRfqInvite[]
+  quotes  VendorRfqQuote[]   @relation("RfqQuotes")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+}
+
+model VendorRfqInvite {
+  id    String    @id @default(cuid())
+  rfqId String
+  rfq   VendorRfq @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  invitedAt DateTime @default(now())
+
+  @@unique([rfqId, vendorId])
+  @@index([rfqId])
+}
+
+model VendorRfqQuote {
+  id    String    @id @default(cuid())
+  rfqId String
+  rfq   VendorRfq @relation("RfqQuotes", fields: [rfqId], references: [id], onDelete: Cascade)
+
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  rate         Float
+  moqPieces    Int?
+  leadTimeDays Int?
+  notes        String?
+
+  awardedFor VendorRfq? @relation("AwardedQuote")
+
+  submittedAt DateTime @default(now())
+
+  @@unique([rfqId, vendorId])
+  @@index([rfqId])
+}
+
 // ─── Quotes ─────────────────────────────────────────────────────────────
 
 enum QuoteStatus {
@@ -305,7 +386,8 @@ model Quote {
   orderId String? @unique
   order   Order?  @relation(fields: [orderId], references: [id])
 
-  lines QuoteLineItem[]
+  lines     QuoteLineItem[]
+  costSheet CostSheet?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -328,6 +410,54 @@ model QuoteLineItem {
   lineTotal   Float
 
   @@index([quoteId])
+}
+
+// ─── Costing engine (Incoterm-aware landed cost per quote) ───────────────
+
+enum CostCategory {
+  material
+  conversion
+  packing
+  inland_freight
+  cha
+  port
+  freight
+  insurance
+  finance_cost
+  duties
+  other
+}
+
+model CostSheet {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  quoteId String @unique
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  incoterm      String
+  sellPricePerUnit Float
+  rodtepPct     Float @default(0)
+
+  lines CostSheetLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model CostSheetLine {
+  id          String    @id @default(cuid())
+  costSheetId String
+  costSheet   CostSheet @relation(fields: [costSheetId], references: [id], onDelete: Cascade)
+
+  category      CostCategory
+  label         String?
+  amountPerUnit Float
+
+  @@index([costSheetId])
 }
 
 // ─── Invoices ───────────────────────────────────────────────────────────
@@ -409,14 +539,48 @@ model Order {
   originPort  String?
   destPort    String?
 
-  quote       Quote?
-  invoices    Invoice[]
-  buyerTracks OrderBuyerTrack[]
+  quote           Quote?
+  invoices        Invoice[]
+  buyerTracks     OrderBuyerTrack[]
+  exportDocuments ExportDocument[]
+  shipmentMilestones ShipmentMilestone[]
+  lettersOfCredit LetterOfCredit[]
+  incentiveClaims IncentiveClaim[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, status])
+}
+
+// ─── Export documents (proforma/CI/PL/COO, AI cross-doc consistency) ─────
+
+enum ExportDocumentType {
+  proforma_invoice
+  commercial_invoice
+  packing_list
+  certificate_of_origin
+}
+
+model ExportDocument {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  type    ExportDocumentType
+  version Int
+
+  // Snapshot of the field values the document was generated with (buyer info, line items, etc.)
+  data Json
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  @@unique([orderId, type, version])
+  @@index([tenantId, orderId])
 }
 
 model OrderBuyerTrack {
@@ -527,4 +691,205 @@ model AuditEntry {
 
   @@index([tenantId, collection, documentId])
   @@index([tenantId, createdAt])
+}
+
+// ─── File attachments ────────────────────────────────────────────────────
+
+model Document {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Polymorphic attachment target, same pattern as AuditEntry (e.g. collection="orders", documentId=order.id)
+  collection String
+  documentId String
+
+  fileName   String
+  mimeType   String
+  size       Int
+  storageKey String
+
+  uploadedByUserId String
+  uploadedByEmail  String
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, collection, documentId])
+}
+
+// ─── HS code assistant (AI classification cache) ─────────────────────────
+
+model HsCode {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  description String
+  hsCode      String
+  dutyRatePct Float?
+  rodtepRatePct Float?
+  rationale   String
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, description])
+  @@index([tenantId])
+}
+
+// ─── Compliance vault & deadline engine ───────────────────────────────────
+
+enum ComplianceCategory {
+  iec
+  ad_code
+  gst_lut
+  rcmc
+  fssai
+  cdsco
+  bis
+  buyer_cert
+  other
+}
+
+model ComplianceItem {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  category         ComplianceCategory
+  name             String
+  issuingAuthority String?
+  documentNumber   String?
+  issuedAt         DateTime?
+  expiresAt        DateTime?
+  renewalLeadDays  Int      @default(30)
+  notes            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, expiresAt])
+}
+
+// ─── Shipment milestones (staff + buyer-visible timeline) ────────────────
+
+enum ShipmentMilestoneType {
+  gate_in
+  sob
+  transhipment
+  arrival
+  do_issued
+  delivered
+}
+
+model ShipmentMilestone {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  type      ShipmentMilestoneType
+  plannedAt DateTime?
+  actualAt  DateTime?
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orderId, type])
+  @@index([tenantId, orderId])
+}
+
+// ─── Denied-party / sanctions screening ───────────────────────────────────
+
+enum ScreeningResult {
+  clear
+  potential_match
+  manual_attestation
+}
+
+model ScreeningCheck {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  subjectName String
+  country     String?
+  result      ScreeningResult
+
+  // Raw match records from the screening source (e.g. trade.gov Consolidated Screening List), if any.
+  matches Json?
+  source  String
+  notes   String?
+
+  checkedByUserId String
+  checkedAt       DateTime @default(now())
+
+  @@index([tenantId, checkedAt])
+}
+
+// ─── LC advisor (AI review of draft LC terms vs the order) ───────────────
+
+model LetterOfCredit {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  lcNumber     String?
+  issuingBank  String?
+  rawText      String
+
+  // AI review output — null until reviewed.
+  workable       Boolean?
+  reviewSummary  String?
+  issues         Json?
+  reviewedAt     DateTime?
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId, orderId])
+}
+
+// ─── Export incentives tracker ────────────────────────────────────────────
+
+enum IncentiveType {
+  rodtep
+  drawback
+  epcg_obligation
+}
+
+enum IncentiveClaimStatus {
+  claimable
+  claimed
+  received
+}
+
+model IncentiveClaim {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  type   IncentiveType
+  status IncentiveClaimStatus @default(claimable)
+
+  amount   Float
+  currency String @default("INR")
+
+  claimedAt  DateTime?
+  receivedAt DateTime?
+  notes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, orderId])
 }

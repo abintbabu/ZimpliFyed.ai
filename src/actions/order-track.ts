@@ -52,7 +52,7 @@ export async function revokeBuyerTrackLink(trackId: string) {
 export async function getBuyerTrackByToken(token: string) {
   const track = await prisma.orderBuyerTrack.findUnique({
     where: { token },
-    include: { order: true },
+    include: { order: { include: { shipmentMilestones: true } } },
   });
   if (!track || !track.active) return null;
 
@@ -67,5 +67,6 @@ export async function getBuyerTrackByToken(token: string) {
     destination: order.destination,
     originPort: order.originPort,
     destPort: order.destPort,
+    milestones: order.shipmentMilestones.map((m) => ({ type: m.type, plannedAt: m.plannedAt, actualAt: m.actualAt })),
   };
 }

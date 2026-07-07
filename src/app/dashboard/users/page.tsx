@@ -4,10 +4,12 @@ import { hasPermission, ROLE_LABELS } from '@/lib/permissions';
 import { listMembers, listPendingInvites } from '@/actions/users';
 import { InviteUserForm } from './invite-form';
 import { RevokeInviteButton } from './revoke-invite-button';
+import { RoleSelect } from './role-select';
 
 export default async function UsersPage() {
   const { tenantId, role } = await requireTenantSession();
   if (!hasPermission(role, 'users:manage')) redirect('/dashboard');
+  const canManageRoles = hasPermission(role, 'roles:manage');
 
   const [members, invites] = await Promise.all([
     listMembers(tenantId),
@@ -38,7 +40,9 @@ export default async function UsersPage() {
                 <tr key={m.id} className="border-t border-line">
                   <td className="px-4 py-2 text-ink">{m.user.name ?? '—'}</td>
                   <td className="px-4 py-2 text-ink">{m.user.email}</td>
-                  <td className="px-4 py-2 text-muted">{ROLE_LABELS[m.role]}</td>
+                  <td className="px-4 py-2 text-muted">
+                    {canManageRoles ? <RoleSelect membershipId={m.id} role={m.role} /> : ROLE_LABELS[m.role]}
+                  </td>
                 </tr>
               ))}
               {members.length === 0 && (

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
+import { writeAudit } from '@/lib/audit';
 import type { VendorRateMethod } from '@prisma/client';
 
 export async function listVendorRates(tenantId: string) {
@@ -29,7 +30,8 @@ export async function createVendorRate(input: {
   leadTimeDays?: number;
   tiers?: { minQty: number; rate: number }[];
 }) {
-  const { tenantId, role } = await requireTenantSession();
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
   if (!hasPermission(role, 'vendors:write')) throw new Error('You do not have permission to add vendor rates');
   if (!input.sku.trim()) throw new Error('SKU/description is required');
 
@@ -48,6 +50,15 @@ export async function createVendorRate(input: {
     },
   });
 
+  await writeAudit({
+    session,
+    collection: 'vendor_rates',
+    documentId: rate.id,
+    action: 'pricing_change',
+    summary: `Added rate for ${rate.sku} (vendor ${rate.vendorId})`,
+    after: { sku: rate.sku, baseRate: rate.baseRate, method: rate.method },
+  });
+
   revalidatePath(`/dashboard/vendors/${input.vendorId}`);
   return rate;
 }
@@ -64,10 +75,25 @@ export async function updateVendorRate(
     leadTimeDays: number;
   }>,
 ) {
-  const { tenantId, role } = await requireTenantSession();
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
   if (!hasPermission(role, 'vendors:write')) throw new Error('You do not have permission to update vendor rates');
 
+  const before = await prisma.vendorRate.findFirst({ where: { id: rateId, tenantId } });
+  if (!before) throw new Error('Vendor rate not found');
+
   const rate = await prisma.vendorRate.update({ where: { id: rateId, tenantId }, data: input });
+
+  await writeAudit({
+    session,
+    collection: 'vendor_rates',
+    documentId: rateId,
+    action: 'pricing_change',
+    summary: `Updated rate for ${before.sku} (vendor ${before.vendorId})`,
+    before: { baseRate: before.baseRate, method: before.method },
+    after: { baseRate: rate.baseRate, method: rate.method },
+  });
+
   revalidatePath(`/dashboard/vendors/${rate.vendorId}`);
   return rate;
 }
