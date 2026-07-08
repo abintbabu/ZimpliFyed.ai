@@ -78,6 +78,39 @@ export async function createQuote(input: { quoteNumber: string; leadId?: string;
   return quote;
 }
 
+export async function updateQuoteLines(quoteId: string, lines: QuoteLineInput[]) {
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
+  if (!hasPermission(role, 'quotes:write')) throw new Error('You do not have permission to edit quotes');
+
+  const before = await prisma.quote.findFirst({ where: { id: quoteId, tenantId } });
+  if (!before) throw new Error('Quote not found');
+
+  const { lines: withTotals, total, overallMarginPct } = buildLineTotals(lines);
+
+  const quote = await prisma.$transaction(async (tx) => {
+    await tx.quoteLineItem.deleteMany({ where: { quoteId } });
+    return tx.quote.update({
+      where: { id: quoteId, tenantId },
+      data: { total, overallMarginPct, lines: { create: withTotals } },
+      include: { lines: true },
+    });
+  });
+
+  await writeAudit({
+    session,
+    collection: 'quotes',
+    documentId: quoteId,
+    action: 'update',
+    summary: `Updated line items for quote ${before.quoteNumber}`,
+    before: { total: before.total },
+    after: { total: quote.total },
+  });
+
+  revalidatePath(`/dashboard/quotes/${quoteId}`);
+  return quote;
+}
+
 export async function updateQuoteStatus(quoteId: string, status: QuoteStatus) {
   const session = await requireTenantSession();
   const { tenantId, role } = session;

@@ -6,6 +6,7 @@ import { getCostSheet } from '@/actions/cost-sheets';
 import { prisma } from '@/lib/prisma';
 import { DealRail } from '@/components/deal-rail';
 import { CostSheetPanel } from '@/components/cost-sheet-panel';
+import { QuoteLineItemsPanel } from '@/components/quote-line-items-panel';
 import { QuoteActions } from './quote-actions';
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -37,37 +38,12 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
 
       <DealRail current="quote" quote={quote} order={order} invoice={invoice} />
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-black/[0.02] text-left text-xs font-semibold uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Description</th>
-              <th className="px-4 py-3">Qty</th>
-              <th className="px-4 py-3">Cost</th>
-              <th className="px-4 py-3">Exp %</th>
-              <th className="px-4 py-3">Margin %</th>
-              <th className="px-4 py-3">Unit price</th>
-              <th className="px-4 py-3">Line total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quote.lines.map((l) => (
-              <tr key={l.id} className="border-t border-line">
-                <td className="px-4 py-3 text-ink">{l.description}</td>
-                <td className="px-4 py-3 text-muted">{l.quantity}</td>
-                <td className="px-4 py-3 text-muted">{l.cost.toFixed(2)}</td>
-                <td className="px-4 py-3 text-muted">{l.expensePct}%</td>
-                <td className="px-4 py-3 text-muted">{l.marginPct}%</td>
-                <td className="px-4 py-3 text-muted">{l.unitPrice.toFixed(2)}</td>
-                <td className="px-4 py-3 text-muted">{l.lineTotal.toFixed(2)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="border-t border-line px-4 py-3 text-right text-sm font-medium text-ink">
-          Total: {quote.currency} {quote.total.toFixed(2)}
-        </div>
-      </div>
+      <QuoteLineItemsPanel
+        quoteId={quote.id}
+        currency={quote.currency}
+        canWrite={hasPermission(role, 'quotes:write')}
+        initial={quote.lines}
+      />
 
       <CostSheetPanel
         quoteId={quote.id}

@@ -4,6 +4,7 @@ import { hasPermission } from '@/lib/permissions';
 import { getInvoice } from '@/actions/invoices';
 import { prisma } from '@/lib/prisma';
 import { DealRail } from '@/components/deal-rail';
+import { InvoiceLineItemsPanel } from '@/components/invoice-line-items-panel';
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,30 +27,15 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
       <DealRail current="invoice" quote={order?.quote} order={order} invoice={invoice} />
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-black/[0.02] text-left text-xs font-semibold uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Description</th>
-              <th className="px-4 py-3">Qty</th>
-              <th className="px-4 py-3">Unit price</th>
-              <th className="px-4 py-3">Line total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoice.lines.map((l) => (
-              <tr key={l.id} className="border-t border-line">
-                <td className="px-4 py-3 text-ink">{l.description}</td>
-                <td className="px-4 py-3 text-muted">{l.quantity}</td>
-                <td className="px-4 py-3 text-muted">{l.unitPrice.toFixed(2)}</td>
-                <td className="px-4 py-3 text-muted">{l.lineTotal.toFixed(2)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="border-t border-line px-4 py-3 text-right text-sm font-medium text-ink">
-          Balance due: {invoice.currency} {invoice.balanceDue.toFixed(2)}
-        </div>
+      <InvoiceLineItemsPanel
+        invoiceId={invoice.id}
+        currency={invoice.currency}
+        canWrite={hasPermission(role, 'invoices:write')}
+        initial={invoice.lines}
+      />
+
+      <div className="rounded-2xl border border-line bg-white px-4 py-3 text-right text-sm font-medium text-ink">
+        Balance due: {invoice.currency} {invoice.balanceDue.toFixed(2)}
       </div>
     </div>
   );

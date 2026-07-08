@@ -4,7 +4,11 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit } from "@/lib/rate-limit";
 import type { MembershipRole } from "@prisma/client";
+
+const LOGIN_ATTEMPT_LIMIT = 5;
+const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 
 export type SessionMembership = { tenantId: string; tenantSlug: string; role: MembershipRole };
 
@@ -15,6 +19,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      allowDangerousEmailAccountLinking: true,
     }),
     Credentials({
       name: "Credentials",
@@ -26,6 +31,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const username = credentials?.username;
         const password = credentials?.password;
         if (typeof username !== "string" || typeof password !== "string") return null;
+
+        const allowed = checkRateLimit(
+          `login:${username.trim().toLowerCase()}`,
+          LOGIN_ATTEMPT_LIMIT,
+          LOGIN_ATTEMPT_WINDOW_MS,
+        );
+        if (!allowed) return null;
 
         const user = await prisma.user.findUnique({ where: { email: username } });
         if (!user?.password) return null;

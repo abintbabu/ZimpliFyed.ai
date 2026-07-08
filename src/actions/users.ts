@@ -5,7 +5,11 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
+import { checkRateLimit } from '@/lib/rate-limit';
 import type { MembershipRole } from '@prisma/client';
+
+const INVITE_LIMIT = 20;
+const INVITE_WINDOW_MS = 60 * 60 * 1000;
 
 export async function listMembers(tenantId: string) {
   return prisma.membership.findMany({
@@ -27,6 +31,10 @@ export async function inviteUser(email: string, role: MembershipRole) {
   const { tenantId, role: callerRole, userId } = session;
   if (!hasPermission(callerRole, 'users:manage')) {
     throw new Error('You do not have permission to invite users');
+  }
+
+  if (!checkRateLimit(`invite:${tenantId}`, INVITE_LIMIT, INVITE_WINDOW_MS)) {
+    throw new Error('Too many invites sent recently. Please try again later.');
   }
 
   await prisma.invite.upsert({

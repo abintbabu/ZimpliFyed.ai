@@ -78,6 +78,41 @@ export async function createInvoice(input: {
   return invoice;
 }
 
+export async function updateInvoiceLines(invoiceId: string, lines: InvoiceLineInput[]) {
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
+  if (!hasPermission(role, 'invoices:write')) throw new Error('You do not have permission to edit invoices');
+
+  const before = await prisma.invoice.findFirst({ where: { id: invoiceId, tenantId } });
+  if (!before) throw new Error('Invoice not found');
+
+  const { lines: withTotals, total } = buildLineTotals(lines);
+  const paidSoFar = before.total - before.balanceDue;
+  const balanceDue = Math.max(total - paidSoFar, 0);
+
+  const invoice = await prisma.$transaction(async (tx) => {
+    await tx.invoiceLineItem.deleteMany({ where: { invoiceId } });
+    return tx.invoice.update({
+      where: { id: invoiceId, tenantId },
+      data: { total, balanceDue, lines: { create: withTotals } },
+      include: { lines: true },
+    });
+  });
+
+  await writeAudit({
+    session,
+    collection: 'invoices',
+    documentId: invoiceId,
+    action: 'update',
+    summary: `Updated line items for invoice ${before.invoiceNumber}`,
+    before: { total: before.total, balanceDue: before.balanceDue },
+    after: { total: invoice.total, balanceDue: invoice.balanceDue },
+  });
+
+  revalidatePath(`/dashboard/invoices/${invoiceId}`);
+  return invoice;
+}
+
 export async function updateInvoiceStatus(invoiceId: string, status: InvoiceStatus, balanceDue?: number) {
   const session = await requireTenantSession();
   const { tenantId, role } = session;
