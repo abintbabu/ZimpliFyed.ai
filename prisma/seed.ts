@@ -5,6 +5,7 @@ async function main() {
   // Deferred until after dotenv config runs — src/lib/prisma reads DATABASE_URL at import time.
   const { prisma } = await import("../src/lib/prisma");
   const { DEV_TENANT_SLUG } = await import("../src/lib/tenant-resolver");
+  const bcrypt = (await import("bcryptjs")).default;
 
   const tenant = await prisma.tenant.upsert({
     where: { slug: DEV_TENANT_SLUG },
@@ -12,6 +13,26 @@ async function main() {
     update: {},
   });
   console.log(`Tenant ready: ${tenant.slug} (${tenant.id})`);
+
+  const testAccounts = [
+    { email: "admin@zimplifyed.ai", password: "Admin@123", name: "Admin User", role: "admin" as const },
+    { email: "member@zimplifyed.ai", password: "Member@123", name: "Member User", role: "viewer" as const },
+  ];
+
+  for (const account of testAccounts) {
+    const passwordHash = await bcrypt.hash(account.password, 10);
+    const user = await prisma.user.upsert({
+      where: { email: account.email },
+      create: { email: account.email, name: account.name, password: passwordHash },
+      update: { password: passwordHash },
+    });
+    await prisma.membership.upsert({
+      where: { userId_tenantId: { userId: user.id, tenantId: tenant.id } },
+      create: { userId: user.id, tenantId: tenant.id, role: account.role },
+      update: {},
+    });
+    console.log(`Test login ready: ${account.email} / ${account.password}`);
+  }
 
   const vendor = await prisma.vendor.upsert({
     where: { id: `${tenant.id}-demo-vendor` },

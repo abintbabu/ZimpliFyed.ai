@@ -42,7 +42,7 @@ async function buildContext(tenantId: string): Promise<string> {
   return lines.join('\n');
 }
 
-const SYSTEM_PROMPT = `You are Simplifi Copilot, an assistant for an export trading company's CRM/ops platform. Answer questions using only the tenant data provided in the context below — do not invent orders, quotes, or figures that aren't there. If the data needed to answer isn't in the context, say so plainly rather than guessing. Keep answers concise and business-focused (this is a busy trader, not a chat companion).`;
+const SYSTEM_PROMPT = `You are Zimplifyed Copilot, an assistant for an export trading company's CRM/ops platform. Answer questions using only the tenant data provided in the context below — do not invent orders, quotes, or figures that aren't there. If the data needed to answer isn't in the context, say so plainly rather than guessing. Keep answers concise and business-focused (this is a busy trader, not a chat companion).`;
 
 export async function askCopilot(tenantId: string, history: CopilotMessage[]): Promise<string> {
   const context = await buildContext(tenantId);

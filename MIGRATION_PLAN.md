@@ -1,11 +1,11 @@
-# Simplifi.ai — Migration Manifest (from anabyn-website)
+# Zimplifyed.ai — Migration Manifest (from anabyn-website)
 
 Source: `/Users/abinbabu/anabyn-website` · Target: this repo.
 Decisions locked in: **next-auth + Postgres/Prisma** (drop Firebase), **Next.js 16** (adapt, don't downgrade), generic CRM/ops core only (no textile modules).
 
 ## 1. Stack changes required
 
-| Concern | anabyn-website | Simplifi.ai |
+| Concern | anabyn-website | Zimplifyed.ai |
 |---|---|---|
 | Framework | Next 15 (App Router, Turbopack) | Next 16 (App Router) — audit `src/app/**` for Next 16 async-API / codemod changes before porting each route |
 | Auth | Firebase Auth + custom claims (`role`, `tenantId`) via session cookie decoded in `middleware.ts` | next-auth v5 — replace claims with a `Membership` table (`userId`, `tenantId`, `role`); JWT callback embeds `tenantId`+`role` |
@@ -44,7 +44,7 @@ Keep: `leads`, `kanban`, `contacts`, `customers`, `quotes`, `invoices`, `orders`
 
 Drop: `linen-intelligence`, `pricing`, `rate-sheets`, `par-stock`, `production`, `whatsapp-leads` (fold into `leads` if needed).
 
-Note: this repo has no `[locale]` i18n today (no next-intl). Decide whether Simplifi.ai needs i18n before porting locale-aware routing, or flatten routes to non-localized paths.
+Note: this repo has no `[locale]` i18n today (no next-intl). Decide whether Zimplifyed.ai needs i18n before porting locale-aware routing, or flatten routes to non-localized paths.
 
 ## 4. Components to port (`src/components/admin/**`, `src/components/portal/**`, `src/components/order/**`, `src/components/invoice/**`, `src/components/quote/**`, `src/components/rfq/**`)
 
@@ -64,7 +64,7 @@ Keep but evaluate: `parse-vendor-quote.ts`, `receipt-ocr.ts` action (generic OCR
 ## 6. Multi-tenancy + billing (new work, not a port)
 
 1. `Tenant` Prisma model (id, slug, name, plan, status, branding, stripeCustomerId).
-2. Subdomain resolution in `middleware.ts`: `{slug}.simplifi.ai` → tenant lookup (edge-safe: cache in a KV/Edge Config, don't hit Postgres from middleware).
+2. Subdomain resolution in `middleware.ts`: `{slug}.zimplifyed.ai` → tenant lookup (edge-safe: cache in a KV/Edge Config, don't hit Postgres from middleware).
 3. next-auth JWT/session callback embeds `tenantId` + `role`; every Prisma query in server actions filters `where: { tenantId }` (equivalent of anabyn's `tenantTag()`/`assertTenantContext()` — port that guard pattern against Prisma instead of Firestore).
 4. Stripe: reuse `src/lib/stripe.ts` almost unchanged (it's SDK-only, no Firebase); add Checkout + webhook route + plan gating.
 5. Tenant self-signup + first-admin provisioning (replaces `account-provisioning.ts`'s Firebase-specific bits with next-auth equivalent).
@@ -87,7 +87,7 @@ Ported ahead of the suggested order, from anabyn-website's vendor-rate-calculato
 
 **Deliberately dropped** (textile-specific, per section 7 exclusions): `pricing-groups.ts` category bucketing, any `ProductPricing`/rate-sheet linkage — `VendorRate.sku` is a plain string key, not tied to a product catalog.
 
-**Not yet done**: full quote/invoice line-item edit UI (only create), RFQ/lead linkage beyond `leadId` string, AQL/shipment milestones, vendor portal, `super-admin-gate`, AI flows, Stripe/billing, multi-tenant subdomain middleware. Local dev DB note: `prisma.config.ts` needed an explicit `datasource.url` for `prisma migrate dev` under Prisma 7; local Postgres has no `postgres` role, so dev commands should point `DATABASE_URL` at a role that exists on the machine (e.g. `postgresql://<os-user>@localhost:5432/simplifi`) rather than the `.env.local` placeholder.
+**Not yet done**: full quote/invoice line-item edit UI (only create), RFQ/lead linkage beyond `leadId` string, AQL/shipment milestones, vendor portal, `super-admin-gate`, AI flows, Stripe/billing, multi-tenant subdomain middleware. Local dev DB note: `prisma.config.ts` needed an explicit `datasource.url` for `prisma migrate dev` under Prisma 7; local Postgres has no `postgres` role, so dev commands should point `DATABASE_URL` at a role that exists on the machine (e.g. `postgresql://<os-user>@localhost:5432/zimplifyed`) rather than the `.env.local` placeholder.
 
 ## 8. Suggested execution order
 

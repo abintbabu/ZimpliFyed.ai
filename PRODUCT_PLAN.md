@@ -1,8 +1,8 @@
-# Simplifi.ai — Product & Development Plan
+# Zimplifyed.ai — Product & Development Plan
 
 **The AI-first operating system for Indian exporters** — manufacturers and merchant traders — covering the full journey: buyer discovery → quote → order → production/sourcing → compliance & docs → shipment → payment → incentives.
 
-Status baseline (Jul 2026): Next 16 + Prisma/Postgres + next-auth, multi-tenant, dashboard shell with Leads, Quotes, Invoices, Orders, Vendors, Tasks, Users, Settings. `MIGRATION_PLAN.md` governs the port from anabyn-website; this document governs what Simplifi.ai becomes.
+Status baseline (Jul 2026): Next 16 + Prisma/Postgres + next-auth, multi-tenant, dashboard shell with Leads, Quotes, Invoices, Orders, Vendors, Tasks, Users, Settings. `MIGRATION_PLAN.md` governs the port from anabyn-website; this document governs what Zimplifyed.ai becomes.
 
 ---
 
@@ -72,8 +72,8 @@ Design rule: **every module must be usable by a 3-person firm** — enterprise d
 31. **Analytics** — funnel (lead→quote→order win rate), lane profitability, buyer concentration risk, vendor scorecards, DSO.
 32. **Notifications** — in-app + email + WhatsApp (buyer/vendor comms where they live).
 
-### G. AI layer (cross-cutting — the "AI-first" in Simplifi.ai)
-33. **Simplifi Copilot** — chat over your own data: "which orders ship this week?", "draft a reply to Al Noor's price pushback", "why is margin down on ORD-114?"
+### G. AI layer (cross-cutting — the "AI-first" in Zimplifyed.ai)
+33. **Zimplifyed Copilot** — chat over your own data: "which orders ship this week?", "draft a reply to Al Noor's price pushback", "why is margin down on ORD-114?"
 34. **Draft-with-AI everywhere** — quotes, invoices, emails, WhatsApp replies, LC discrepancy responses. *(pattern exists in anabyn — port)*
 35. **Document intelligence** — upload any buyer PO / LC / test report → extracted, validated against the order, discrepancies flagged.
 36. **Daily founder brief** — one morning digest: cash position, at-risk shipments, expiring compliance, stale leads, incentive deadlines.
@@ -149,7 +149,7 @@ All rows carry `tenantId`; enforce via Prisma client extension (global where + w
 Finish MIGRATION_PLAN core: app-shell port (enterprise layout above), audit trail, file storage (R2/S3), permissions matrix, tenant-scoped Prisma extension, seed data. **Exit:** demo tenant navigable end-to-end.
 
 ### Phase 1 — Trader MVP: quote-to-cash (4–6 wks)
-Deepen what exists: RFQ intake w/ AI extraction (§3), vendor RFQ + rate comparison (§7), costing engine v1 (§8), Incoterm-aware quote builder, order tracking link, invoice + payment schedules (§21–22), Copilot v1 over leads/quotes/orders. **Exit:** a trader can run a full deal in Simplifi and know their true margin.
+Deepen what exists: RFQ intake w/ AI extraction (§3), vendor RFQ + rate comparison (§7), costing engine v1 (§8), Incoterm-aware quote builder, order tracking link, invoice + payment schedules (§21–22), Copilot v1 over leads/quotes/orders. **Exit:** a trader can run a full deal in Zimplifyed and know their true margin.
 
 ### Phase 2 — Ship & comply moat (6 wks)
 Document generator with cross-doc consistency AI (§14) — start with proforma/CI/PL/COO; HS assistant (§15); compliance vault + deadline engine (§16); shipment milestones + buyer timeline (§18); denied-party screening (§20); LC advisor v1 (§17). **Exit:** one shipment's full doc set produced and AI-validated in-app.

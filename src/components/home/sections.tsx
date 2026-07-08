@@ -60,7 +60,7 @@ export function Problem() {
                 S
               </span>
               <div>
-                <p className="text-sm font-semibold text-ink">One Simplifi suite</p>
+                <p className="text-sm font-semibold text-ink">One Zimplifyed suite</p>
                 <p className="text-xs text-muted">Everything connected, out of the box.</p>
               </div>
             </div>
@@ -74,8 +74,8 @@ export function Problem() {
 /* ---------- AI layer (the centerpiece) ---------- */
 export function AILayer() {
   const items = [
-    ["Just ask, it's done", "Onboard a vendor, raise a PO, run payroll — describe it and Simplifi executes across every module."],
-    ["Auto data entry", "Drop in a PO or invoice — Simplifi reads it and fills the records in seconds."],
+    ["Just ask, it's done", "Onboard a vendor, raise a PO, run payroll — describe it and Zimplifyed executes across every module."],
+    ["Auto data entry", "Drop in a PO or invoice — Zimplifyed reads it and fills the records in seconds."],
     ["Demand forecasting", "Predicts stock-outs and reorder timing from your real history."],
     ["Anomaly alerts", "Flags margin dips, late shipments and cash-flow risks early."],
   ];
@@ -87,7 +87,7 @@ export function AILayer() {
       <Container className="relative">
         <SectionHeading
           center
-          eyebrow="The AI in Simplifi"
+          eyebrow="The AI in Zimplifyed"
           title="Your suite does the busywork for you"
           highlight="busywork"
           sub="An intelligence layer that spans every module — because it all lives in one place. Any complex action, completed in under two minutes."
@@ -169,7 +169,7 @@ export function Solutions() {
           eyebrow="Solutions"
           title="Tuned for how your industry actually works"
           highlight="actually works"
-          sub="Simplifi ships with the workflows, documents and compliance built for trade and manufacturing — not generic templates."
+          sub="Zimplifyed ships with the workflows, documents and compliance built for trade and manufacturing — not generic templates."
         />
         <div className="mt-14 grid gap-5 md:grid-cols-2">
           {industries.map((ind) => (
@@ -198,7 +198,7 @@ export function Solutions() {
   );
 }
 
-/* ---------- Why Simplifi (comparison) ---------- */
+/* ---------- Why Zimplifyed (comparison) ---------- */
 export function Why() {
   const rows = [
     ["Time to set up", "Months of evaluation", "Days, guided by AI"],
@@ -213,7 +213,7 @@ export function Why() {
       <Container>
         <SectionHeading
           center
-          eyebrow="Why Simplifi"
+          eyebrow="Why Zimplifyed"
           title="Bundled beats stitching tools together"
           highlight="Bundled"
         />
@@ -221,13 +221,13 @@ export function Why() {
           <div className="grid grid-cols-3 border-b border-line bg-surface text-sm font-semibold text-ink">
             <div className="p-4" />
             <div className="p-4 text-muted">DIY stack</div>
-            <div className="p-4 text-gradient">Simplifi AI</div>
+            <div className="p-4 text-gradient">Zimplifyed AI</div>
           </div>
-          {rows.map(([label, diy, simplifi]) => (
+          {rows.map(([label, diy, zimplifyed]) => (
             <div key={label} className="grid grid-cols-3 border-b border-line text-sm last:border-0">
               <div className="p-4 font-medium text-ink">{label}</div>
               <div className="p-4 text-muted">{diy}</div>
-              <div className="bg-brand-soft/50 p-4 font-medium text-ink">{simplifi}</div>
+              <div className="bg-brand-soft/50 p-4 font-medium text-ink">{zimplifyed}</div>
             </div>
           ))}
         </div>
@@ -277,7 +277,7 @@ export function Pricing() {
           sub="No per-tool licensing, no surprise tiers. Everything included, scaling with your team."
         />
         <div className="border-gradient mx-auto mt-12 max-w-md rounded-2xl p-8 shadow-[0_30px_70px_-35px_rgba(29,78,216,0.45)]">
-          <p className="text-sm font-semibold text-gradient">Simplifi Suite</p>
+          <p className="text-sm font-semibold text-gradient">Zimplifyed Suite</p>
           <p className="mt-3 text-4xl font-semibold text-ink">
             $—<span className="text-base font-normal text-muted"> /seat / month</span>
           </p>
@@ -325,7 +325,7 @@ export function FinalCTA() {
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-lg text-white/75">
               One AI-powered suite that runs export, import, trade and
-              manufacturing. Describe what you need — Simplifi does the rest.
+              manufacturing. Describe what you need — Zimplifyed does the rest.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button

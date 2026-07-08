@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Simplifi AI — The complete operating system for founders",
-    template: "%s · Simplifi AI",
+    default: "Zimplifyed AI — The complete operating system for founders",
+    template: "%s · Zimplifyed AI",
   },
   description:
     "Every essential business tool — CRM, ERP, HRMS, Payroll, Orders, Inventory — pre-integrated and best-in-class. Built for Export, Import, B2B Trade and Manufacturing.",

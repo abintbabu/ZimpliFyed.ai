@@ -31,7 +31,7 @@ export function SiteFooter() {
                 S
               </span>
               <span className="text-[15px] font-semibold tracking-tight text-ink">
-                Simplifi<span className="text-brand"> AI</span>
+                Zimplifyed<span className="text-brand"> AI</span>
               </span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
@@ -60,7 +60,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-line pt-8 text-sm text-muted sm:flex-row">
-          <p>© {new Date().getFullYear()} Simplifi AI. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Zimplifyed AI. All rights reserved.</p>
           <div className="flex gap-6">
             <Link href="#" className="hover:text-ink">
               Privacy

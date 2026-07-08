@@ -18,7 +18,7 @@ export function DashboardShell({
   return (
     <AppShell
       navItems={navItems}
-      brandLabel="Simplifi AI"
+      brandLabel="Zimplifyed AI"
       userEmail={userEmail}
       roleLabel={roleLabel}
       onLogout={() => signOut({ callbackUrl: '/' })}

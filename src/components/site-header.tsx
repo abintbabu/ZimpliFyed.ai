@@ -11,7 +11,7 @@ export function SiteHeader() {
             S
           </span>
           <span className="text-[15px] font-semibold tracking-tight text-ink">
-            Simplifi<span className="text-brand"> AI</span>
+            Zimplifyed<span className="text-brand"> AI</span>
           </span>
         </Link>
 

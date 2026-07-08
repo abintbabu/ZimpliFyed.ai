@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { createLocalStorageFlag } from '@/lib/local-storage-flag';
 
-const darkFlag = createLocalStorageFlag('simplifi-panel-theme-dark');
+const darkFlag = createLocalStorageFlag('zimplifyed-panel-theme-dark');
 
 export function usePanelTheme() {
   const { value: isDark, toggle } = darkFlag.useFlag();

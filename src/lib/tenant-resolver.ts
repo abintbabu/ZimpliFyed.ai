@@ -16,8 +16,8 @@ export function resolveTenantSlug(host: string | null | undefined): string {
     return DEV_TENANT_SLUG;
   }
 
-  // {slug}.simplifi.ai
-  const subMatch = noPort.match(/^([a-z0-9-]+)\.simplifi\.ai$/);
+  // {slug}.zimplifyed.ai
+  const subMatch = noPort.match(/^([a-z0-9-]+)\.zimplifyed\.ai$/);
   if (subMatch && subMatch[1] !== 'www') return subMatch[1];
 
   return DEV_TENANT_SLUG;

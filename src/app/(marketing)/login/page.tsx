@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { GoogleSignInButton } from "@/components/auth/google-button";
+import { CredentialsSignInForm } from "@/components/auth/credentials-form";
 
 export const metadata = {
   title: "Log in",
@@ -19,11 +20,19 @@ export default function LoginPage() {
             Welcome back
           </h1>
           <p className="text-sm text-muted">
-            Sign in to your Simplifi AI workspace
+            Sign in to your Zimplifyed AI workspace
           </p>
         </div>
 
         <div className="rounded-2xl border border-line bg-white p-8 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.22)]">
+          <CredentialsSignInForm />
+
+          <div className="my-6 flex items-center gap-3 text-xs text-muted">
+            <span className="h-px flex-1 bg-line" />
+            or
+            <span className="h-px flex-1 bg-line" />
+          </div>
+
           <GoogleSignInButton label="Continue with Google" />
 
           <p className="mt-6 text-center text-xs text-muted">

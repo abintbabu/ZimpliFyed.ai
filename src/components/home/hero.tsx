@@ -29,7 +29,7 @@ export function Hero() {
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink-soft sm:text-xl">
             CRM, ERP, HR, Payroll, Orders, Inventory — one pre-integrated suite
-            where every app is AI-powered. Chat with Simplifi and it completes any
+            where every app is AI-powered. Chat with Zimplifyed and it completes any
             complex action in under two minutes.
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -61,7 +61,7 @@ function ChatMock() {
           <span className="h-3 w-3 rounded-full bg-line" />
           <span className="h-3 w-3 rounded-full bg-line" />
           <span className="ml-3 text-xs font-medium text-muted">
-            app.simplifi.ai · Ask Simplifi
+            app.zimplifyed.ai · Ask Zimplifyed
           </span>
         </div>
 

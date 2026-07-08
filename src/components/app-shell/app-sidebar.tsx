@@ -9,7 +9,7 @@ import { createLocalStorageFlag } from '@/lib/local-storage-flag';
 import { DarkModeToggle } from './dark-mode-toggle';
 import { isPathActive, isSectionOpen, type AppNavItem } from './types';
 
-const collapseFlag = createLocalStorageFlag('simplifi-sidebar-collapsed');
+const collapseFlag = createLocalStorageFlag('zimplifyed-sidebar-collapsed');
 
 export function useSidebarCollapse() {
   const { value: collapsed, toggle } = collapseFlag.useFlag();

@@ -89,7 +89,7 @@ export const industries = [
 export const navLinks = [
   { label: "Platform", href: "/#platform" },
   { label: "Solutions", href: "/#solutions" },
-  { label: "Why Simplifi", href: "/#why" },
+  { label: "Why Zimplifyed", href: "/#why" },
   { label: "Security", href: "/#security" },
   { label: "Pricing", href: "/#pricing" },
 ] as const;
