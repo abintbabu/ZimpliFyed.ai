@@ -35,26 +35,28 @@ model Tenant {
   stripeCustomerId     String? @unique
   stripeSubscriptionId String? @unique
 
-  memberships Membership[]
-  invites     Invite[]
-  leads       Lead[]
-  tasks       Task[]
-  auditLog    AuditEntry[]
-  vendors     Vendor[]
-  vendorRates VendorRate[]
-  vendorRfqs  VendorRfq[]
-  quotes      Quote[]
-  invoices    Invoice[]
-  orders      Order[]
-  documents   Document[]
-  costSheets  CostSheet[]
-  exportDocuments ExportDocument[]
-  hsCodes     HsCode[]
-  complianceItems ComplianceItem[]
+  memberships        Membership[]
+  invites            Invite[]
+  leads              Lead[]
+  tasks              Task[]
+  auditLog           AuditEntry[]
+  vendors            Vendor[]
+  vendorRates        VendorRate[]
+  vendorRfqs         VendorRfq[]
+  quotes             Quote[]
+  invoices           Invoice[]
+  orders             Order[]
+  documents          Document[]
+  costSheets         CostSheet[]
+  exportDocuments    ExportDocument[]
+  hsCodes            HsCode[]
+  complianceItems    ComplianceItem[]
   shipmentMilestones ShipmentMilestone[]
-  screeningChecks ScreeningCheck[]
-  lettersOfCredit LetterOfCredit[]
-  incentiveClaims IncentiveClaim[]
+  screeningChecks    ScreeningCheck[]
+  lettersOfCredit    LetterOfCredit[]
+  incentiveClaims    IncentiveClaim[]
+  aiInteractions     AiInteraction[]
+  meterEvents        MeterEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -244,9 +246,9 @@ model Vendor {
   phone       String?
   bankDetails String?
 
-  rates       VendorRate[]
-  rfqInvites  VendorRfqInvite[]
-  rfqQuotes   VendorRfqQuote[]
+  rates      VendorRate[]
+  rfqInvites VendorRfqInvite[]
+  rfqQuotes  VendorRfqQuote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -314,11 +316,11 @@ model VendorRfq {
   dueDate     DateTime?
   status      VendorRfqStatus @default(open)
 
-  awardedQuoteId String?      @unique
+  awardedQuoteId String?         @unique
   awardedQuote   VendorRfqQuote? @relation("AwardedQuote", fields: [awardedQuoteId], references: [id])
 
   invites VendorRfqInvite[]
-  quotes  VendorRfqQuote[]   @relation("RfqQuotes")
+  quotes  VendorRfqQuote[]  @relation("RfqQuotes")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -437,9 +439,9 @@ model CostSheet {
   quoteId String @unique
   quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 
-  incoterm      String
+  incoterm         String
   sellPricePerUnit Float
-  rodtepPct     Float @default(0)
+  rodtepPct        Float  @default(0)
 
   lines CostSheetLine[]
 
@@ -540,13 +542,13 @@ model Order {
   originPort  String?
   destPort    String?
 
-  quote           Quote?
-  invoices        Invoice[]
-  buyerTracks     OrderBuyerTrack[]
-  exportDocuments ExportDocument[]
+  quote              Quote?
+  invoices           Invoice[]
+  buyerTracks        OrderBuyerTrack[]
+  exportDocuments    ExportDocument[]
   shipmentMilestones ShipmentMilestone[]
-  lettersOfCredit LetterOfCredit[]
-  incentiveClaims IncentiveClaim[]
+  lettersOfCredit    LetterOfCredit[]
+  incentiveClaims    IncentiveClaim[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -725,11 +727,11 @@ model HsCode {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  description String
-  hsCode      String
-  dutyRatePct Float?
+  description   String
+  hsCode        String
+  dutyRatePct   Float?
   rodtepRatePct Float?
-  rationale   String
+  rationale     String
 
   createdAt DateTime @default(now())
 
@@ -762,7 +764,7 @@ model ComplianceItem {
   documentNumber   String?
   issuedAt         DateTime?
   expiresAt        DateTime?
-  renewalLeadDays  Int      @default(30)
+  renewalLeadDays  Int                @default(30)
   notes            String?
 
   createdAt DateTime @default(now())
@@ -840,15 +842,15 @@ model LetterOfCredit {
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  lcNumber     String?
-  issuingBank  String?
-  rawText      String
+  lcNumber    String?
+  issuingBank String?
+  rawText     String
 
   // AI review output — null until reviewed.
-  workable       Boolean?
-  reviewSummary  String?
-  issues         Json?
-  reviewedAt     DateTime?
+  workable      Boolean?
+  reviewSummary String?
+  issues        Json?
+  reviewedAt    DateTime?
 
   createdByUserId String
   createdAt       DateTime @default(now())
@@ -893,4 +895,70 @@ model IncentiveClaim {
 
   @@index([tenantId, status])
   @@index([tenantId, orderId])
+}
+
+// ─── AI platform: metering + feedback (VISION_1B §10 debt-clock) ──────────
+
+enum AiFeature {
+  copilot
+  rfq_extraction
+}
+
+enum AiFeedbackRating {
+  accept
+  edit
+  reject
+}
+
+model AiInteraction {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  userId String?
+
+  feature AiFeature
+  model   String
+
+  promptTokens     Int?
+  completionTokens Int?
+
+  feedback AiFeedback?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, feature])
+  @@index([tenantId, createdAt])
+}
+
+model AiFeedback {
+  id String @id @default(cuid())
+
+  aiInteractionId String        @unique
+  aiInteraction   AiInteraction @relation(fields: [aiInteractionId], references: [id], onDelete: Cascade)
+
+  rating AiFeedbackRating
+  note   String?
+
+  createdAt DateTime @default(now())
+}
+
+enum MeterEventKind {
+  ai_action
+  doc_set
+  shipment
+}
+
+model MeterEvent {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  kind     MeterEventKind
+  quantity Int            @default(1)
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, kind, createdAt])
 }

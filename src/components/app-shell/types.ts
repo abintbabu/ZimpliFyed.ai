@@ -1,5 +1,5 @@
-import type React from 'react';
 import type { MembershipRole } from '@prisma/client';
+import type { NavIconName } from './nav-icons';
 
 export type AppNavChild = {
   label: string;
@@ -9,7 +9,7 @@ export type AppNavChild = {
 export type AppNavItem = {
   label: string;
   href: string;
-  icon: React.ElementType;
+  icon: NavIconName;
   roles?: MembershipRole[];
   /** Match this item only on an exact path. */
   exact?: boolean;

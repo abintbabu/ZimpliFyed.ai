@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { createLocalStorageFlag } from '@/lib/local-storage-flag';
 import { DarkModeToggle } from './dark-mode-toggle';
 import { isPathActive, isSectionOpen, type AppNavItem } from './types';
+import { NAV_ICONS } from './nav-icons';
 
 const collapseFlag = createLocalStorageFlag('zimplifyed-sidebar-collapsed');
 
@@ -40,7 +41,8 @@ export function AppNavLinks({
   return (
     <>
       {navItems.map(item => {
-        const { label, href, icon: Icon, exact, children, badge } = item;
+        const { label, href, icon, exact, children, badge } = item;
+        const Icon = NAV_ICONS[icon];
         const sectionOpen = isSectionOpen(pathname, item);
         const isActive = isPathActive(pathname, href, exact) || sectionOpen;
 
