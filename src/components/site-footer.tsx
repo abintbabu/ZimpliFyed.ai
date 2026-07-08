@@ -62,10 +62,10 @@ export function SiteFooter() {
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-line pt-8 text-sm text-muted sm:flex-row">
           <p>© {new Date().getFullYear()} Zimplifyed AI. All rights reserved.</p>
           <div className="flex gap-6">
-            <Link href="#" className="hover:text-ink">
+            <Link href="/privacy" className="hover:text-ink">
               Privacy
             </Link>
-            <Link href="#" className="hover:text-ink">
+            <Link href="/terms" className="hover:text-ink">
               Terms
             </Link>
             <Link href="#" className="hover:text-ink">
