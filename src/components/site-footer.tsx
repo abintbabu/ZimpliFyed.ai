@@ -4,11 +4,11 @@ import { Container } from "@/components/ui";
 const cols = [
   {
     title: "Product",
-    links: ["CRM", "ERP", "Orders", "Inventory", "HRMS", "Payroll"],
+    links: ["Quoting", "Vendor sourcing", "Documents", "Shipment tracking", "Incentives"],
   },
   {
     title: "Solutions",
-    links: ["Export", "Import", "B2B Trade", "Manufacturing"],
+    links: ["Merchant exporter", "Manufacturer-exporter", "Export ops", "Founders"],
   },
   {
     title: "Company",
@@ -16,7 +16,7 @@ const cols = [
   },
   {
     title: "Resources",
-    links: ["Blog", "Guides", "ROI Calculator", "Integrations"],
+    links: ["Blog", "Guides", "HS code lookup", "Compliance calendar"],
   },
 ];
 
@@ -35,8 +35,8 @@ export function SiteFooter() {
               </span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
-              The complete operating system for founders. Every essential tool,
-              pre-integrated and best-in-class.
+              The AI-first operating system for Indian exporters — from buyer
+              discovery to payment, in one connected suite.
             </p>
           </div>
 
