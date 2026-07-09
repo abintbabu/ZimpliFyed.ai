@@ -5,6 +5,9 @@
 export const DEFAULT_EXPENSE_PCT = 0;
 export const DEFAULT_MARGIN_PCT = 20;
 
+/** Below this margin%, quote creation is soft-blocked — only an admin/super_admin can override. */
+export const MARGIN_FLOOR_PCT = 10;
+
 /** Price = cost marked up by expense%, then margin-on-price applied. */
 export function priceFromCostAndMargin(costPerUnit: number, marginPct: number): number {
   if (marginPct >= 100) return costPerUnit; // guard: 100% margin-on-price is undefined

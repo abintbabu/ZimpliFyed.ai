@@ -5,6 +5,8 @@ export const DASHBOARD_NAV_ITEMS: AppNavItem[] = [
   { label: 'Daily brief', href: '/dashboard/brief', icon: 'Sunrise' },
   { label: 'Copilot', href: '/dashboard/copilot', icon: 'Sparkles' },
   { label: 'Leads', href: '/dashboard/leads', icon: 'Users2' },
+  { label: 'Buyers', href: '/dashboard/buyers', icon: 'Building2' },
+  { label: 'Products', href: '/dashboard/products', icon: 'Boxes' },
   { label: 'Vendors', href: '/dashboard/vendors', icon: 'Truck' },
   { label: 'RFQs', href: '/dashboard/rfqs', icon: 'Gavel' },
   { label: 'Quotes', href: '/dashboard/quotes', icon: 'FileText' },

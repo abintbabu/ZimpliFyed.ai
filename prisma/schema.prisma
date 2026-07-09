@@ -84,6 +84,10 @@ model Tenant {
   incentiveClaims    IncentiveClaim[]
   aiInteractions     AiInteraction[]
   meterEvents        MeterEvent[]
+  buyers             Buyer[]
+  activities         Activity[]
+  products           Product[]
+  priceLists         PriceList[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -203,11 +207,13 @@ model Invite {
   @@index([email])
 }
 
-/** Persistent sliding-window rate limiter (multi-instance safe, replaces the in-memory limiter for auth-critical keys). */
+/**
+ * Persistent sliding-window rate limiter (multi-instance safe, replaces the in-memory limiter for auth-critical keys).
+ */
 model RateLimit {
-  key       String   @id
-  count     Int      @default(0)
-  resetAt   DateTime
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
 
   @@index([resetAt])
 }
@@ -242,9 +248,9 @@ enum LeadQuality {
 }
 
 model Lead {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   isDemo   Boolean @default(false)
 
   source LeadSource
@@ -265,11 +271,15 @@ model Lead {
 
   assignedToUserId String?
 
+  convertedBuyerId String?
+  convertedBuyer   Buyer?  @relation(fields: [convertedBuyerId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, stage])
   @@index([tenantId, leadNumber])
+  @@index([convertedBuyerId])
 }
 
 // ─── Vendors ──────────────────────────────────────────────────────────────
@@ -281,9 +291,9 @@ enum VendorRateMethod {
 }
 
 model Vendor {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   isDemo   Boolean @default(false)
 
   name        String
@@ -420,18 +430,29 @@ enum QuoteStatus {
 }
 
 model Quote {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   isDemo   Boolean @default(false)
 
   quoteNumber String
   leadId      String?
+  buyerId     String?
+  buyer       Buyer?      @relation(fields: [buyerId], references: [id], onDelete: SetNull)
+  priceListId String?
   status      QuoteStatus @default(draft)
 
   currency         String @default("USD")
   total            Float  @default(0)
   overallMarginPct Float?
+
+  version       Int     @default(1)
+  parentQuoteId String?
+  parentQuote   Quote?  @relation("QuoteVersions", fields: [parentQuoteId], references: [id], onDelete: SetNull)
+  revisions     Quote[] @relation("QuoteVersions")
+
+  shareToken String?   @unique
+  expiresAt  DateTime?
 
   orderId String? @unique
   order   Order?  @relation(fields: [orderId], references: [id])
@@ -444,12 +465,16 @@ model Quote {
 
   @@index([tenantId, status])
   @@index([tenantId, leadId])
+  @@index([tenantId, buyerId])
 }
 
 model QuoteLineItem {
   id      String @id @default(cuid())
   quoteId String
   quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   description String
   quantity    Float
@@ -460,6 +485,7 @@ model QuoteLineItem {
   lineTotal   Float
 
   @@index([quoteId])
+  @@index([productId])
 }
 
 // ─── Costing engine (Incoterm-aware landed cost per quote) ───────────────
@@ -479,9 +505,9 @@ enum CostCategory {
 }
 
 model CostSheet {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   isDemo   Boolean @default(false)
 
   quoteId String @unique
@@ -523,9 +549,9 @@ enum InvoiceStatus {
 }
 
 model Invoice {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   isDemo   Boolean @default(false)
 
   invoiceNumber String
@@ -553,6 +579,9 @@ model InvoiceLineItem {
   invoiceId String
   invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
   description String
   quantity    Float
   cost        Float
@@ -562,6 +591,7 @@ model InvoiceLineItem {
   lineTotal   Float
 
   @@index([invoiceId])
+  @@index([productId])
 }
 
 // ─── Orders ─────────────────────────────────────────────────────────────
@@ -576,13 +606,16 @@ enum OrderStatus {
 }
 
 model Order {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   isDemo   Boolean @default(false)
 
   orderNumber String
   status      OrderStatus @default(confirmed)
+
+  buyerId String?
+  buyer   Buyer?  @relation(fields: [buyerId], references: [id], onDelete: SetNull)
 
   product     String?
   quantity    Float?
@@ -675,9 +708,9 @@ enum TaskLinkedType {
 }
 
 model Task {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   isDemo   Boolean @default(false)
 
   title       String
@@ -783,6 +816,8 @@ model HsCode {
   dutyRatePct   Float?
   rodtepRatePct Float?
   rationale     String
+
+  products Product[]
 
   createdAt DateTime @default(now())
 
@@ -1012,4 +1047,166 @@ model MeterEvent {
   createdAt DateTime @default(now())
 
   @@index([tenantId, kind, createdAt])
+}
+
+// ─── CRM backbone (Wave 1: Buyer/Product master data) ─────────────────────
+
+enum ScreeningStatus {
+  unscreened
+  clear
+  flagged
+  blocked
+}
+
+model Buyer {
+  id       String  @id @default(cuid())
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
+
+  name    String
+  country String?
+  address String?
+  taxIds  Json?
+
+  paymentTermsDefault String?
+  currencyDefault     String  @default("USD")
+  creditLimit         Float?
+
+  riskNotes       String?
+  screeningStatus ScreeningStatus @default(unscreened)
+  source          String?
+
+  convertedFromLeadId String? @unique
+
+  contacts   Contact[]
+  priceLists PriceList[]
+  leads      Lead[]
+  quotes     Quote[]
+  orders     Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+}
+
+model Contact {
+  id      String @id @default(cuid())
+  buyerId String
+  buyer   Buyer  @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  name      String
+  email     String?
+  phone     String?
+  whatsapp  String?
+  role      String?
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([buyerId])
+}
+
+enum ActivityKind {
+  call
+  email
+  whatsapp
+  meeting
+  note
+  system
+}
+
+model Activity {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  entityType String // "buyer" | "lead" | "order"
+  entityId   String
+
+  kind    ActivityKind
+  subject String?
+  body    String?
+
+  dueAt      DateTime?
+  doneAt     DateTime?
+  assigneeId String?
+
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, assigneeId, dueAt])
+}
+
+model Product {
+  id       String  @id @default(cuid())
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
+
+  sku         String
+  name        String
+  description String?
+  hsCodeId    String?
+  hsCode      HsCode? @relation(fields: [hsCodeId], references: [id])
+  uom         String  @default("pcs")
+  category    String?
+
+  specs  Json?
+  photos String[]
+  active Boolean  @default(true)
+
+  priceListItems PriceListItem[]
+  quoteLines     QuoteLineItem[]
+  invoiceLines   InvoiceLineItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, active])
+}
+
+model PriceList {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name     String
+  currency String  @default("USD")
+  buyerId  String?
+  buyer    Buyer?  @relation(fields: [buyerId], references: [id], onDelete: SetNull)
+  market   String?
+
+  validFrom DateTime?
+  validTo   DateTime?
+
+  items PriceListItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, buyerId])
+}
+
+model PriceListItem {
+  id          String    @id @default(cuid())
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  incoterm  String
+  unitPrice Float
+  moq       Int?
+
+  @@index([priceListId])
+  @@index([productId])
 }

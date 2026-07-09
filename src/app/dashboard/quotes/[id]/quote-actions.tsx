@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { updateQuoteStatus } from '@/actions/quotes';
+import { updateQuoteStatus, reviseQuote } from '@/actions/quotes';
 import { createOrderFromQuote } from '@/actions/orders';
 import type { QuoteStatus } from '@prisma/client';
 
@@ -14,6 +14,18 @@ export function QuoteActions({ quoteId, status, canWrite }: { quoteId: string; s
 
   return (
     <div className="flex items-center gap-3">
+      <button
+        disabled={pending}
+        onClick={() =>
+          startTransition(async () => {
+            const revision = await reviseQuote(quoteId);
+            router.push(`/dashboard/quotes/${revision.id}`);
+          })
+        }
+        className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink disabled:opacity-50"
+      >
+        Revise
+      </button>
       {status === 'draft' && (
         <button
           disabled={pending}

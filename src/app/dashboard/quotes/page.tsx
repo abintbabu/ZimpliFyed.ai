@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { listQuotes } from '@/actions/quotes';
+import { listBuyers } from '@/actions/buyers';
+import { listProducts } from '@/actions/products';
 import { NewQuoteForm } from './new-quote-form';
 
 export default async function QuotesPage() {
@@ -11,13 +13,23 @@ export default async function QuotesPage() {
   }
 
   const canWrite = hasPermission(role, 'quotes:write');
-  const quotes = await listQuotes(tenantId);
+  const [quotes, buyers, products] = await Promise.all([
+    listQuotes(tenantId),
+    canWrite ? listBuyers(tenantId) : Promise.resolve([]),
+    canWrite ? listProducts(tenantId) : Promise.resolve([]),
+  ]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink">Quotes</h1>
-        {canWrite && <NewQuoteForm />}
+        {canWrite && (
+          <NewQuoteForm
+            buyers={buyers.map((b) => ({ id: b.id, name: b.name }))}
+            products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name }))}
+            canOverrideMarginFloor={role === 'admin' || role === 'super_admin'}
+          />
+        )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-line bg-white">

@@ -19,6 +19,7 @@ _Last updated: 2026-07-09_
 ### PRODUCT_PLAN phases
 - [x] **Phase 0** foundation: shell, audit, permissions matrix, tenant guard (file storage = local flag, see risk R2)
 - [x] **Phase 1** trader MVP: quotes, vendor RFQs (`vendor-rfqs.ts`), cost sheets (`cost-sheets.ts`), orders, invoices, tracking link — *gap: Copilot v1 exists as page, verify depth*
+- [x] **IMPLEMENTATION_PLAN Wave 1** CRM/catalog backbone: Buyer+Contact+Activity+Product+PriceList models, `/dashboard/buyers` (list/detail/contacts/activity/quotes/orders), `/dashboard/products` (list/detail/price-list items), lead→buyer conversion, quote builder buyer+product picker with price-list prefill and margin-floor soft-block (`MARGIN_FLOOR_PCT`, admin override), quote versioning (`reviseQuote`, revision chain UI) + buyer-facing share/accept link (`/quote/[token]`), buyer backfill script (`scripts/backfill-buyers.ts`) — *gap: AI-assisted dedupe for near-duplicate buyer names (script does exact-match only)*
 - [~] **Phase 2** ship & comply: export-documents ✅, hs-codes ✅, compliance ✅, shipment-milestones ✅, screening ✅, letters-of-credit ✅ — *gap: cross-doc consistency AI (needs DOC_ENGINE_SPEC), doc templates beyond first set*
 - [~] **Phase 3** money: incentive-claims ✅, order-pnl ✅, daily founder brief ✅ (`founder-brief.ts`, `/dashboard/brief`) — *gap: e-BRC/FIRC reconciliation, cash-flow forecast*
 - [ ] **Phase 4** manufacturer depth: production stages, QC/AQL, packing, sampling, freight desk

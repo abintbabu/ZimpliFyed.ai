@@ -8,6 +8,8 @@ import { DealRail } from '@/components/deal-rail';
 import { CostSheetPanel } from '@/components/cost-sheet-panel';
 import { QuoteLineItemsPanel } from '@/components/quote-line-items-panel';
 import { QuoteActions } from './quote-actions';
+import { QuoteSharePanel } from './quote-share-panel';
+import Link from 'next/link';
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,13 +32,38 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">{quote.quoteNumber}</h1>
-          <p className="text-sm text-muted capitalize">{quote.status}</p>
+          <h1 className="text-2xl font-semibold text-ink">
+            {quote.quoteNumber} <span className="text-sm font-normal text-muted">v{quote.version}</span>
+          </h1>
+          <p className="text-sm text-muted capitalize">
+            {quote.status} {quote.buyer && <>· {quote.buyer.name}</>}
+          </p>
         </div>
         <QuoteActions quoteId={quote.id} status={quote.status} canWrite={hasPermission(role, 'quotes:write')} />
       </div>
 
+      {(quote.parentQuote || quote.revisions.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+          <span>Revision chain:</span>
+          {quote.parentQuote && (
+            <Link href={`/dashboard/quotes/${quote.parentQuote.id}`} className="text-brand hover:underline">
+              {quote.parentQuote.quoteNumber} (v{quote.parentQuote.version})
+            </Link>
+          )}
+          <span className="font-medium text-ink">{quote.quoteNumber} (v{quote.version}, current)</span>
+          {quote.revisions.map((r) => (
+            <Link key={r.id} href={`/dashboard/quotes/${r.id}`} className="text-brand hover:underline">
+              {r.quoteNumber} (v{r.version})
+            </Link>
+          ))}
+        </div>
+      )}
+
       <DealRail current="quote" quote={quote} order={order} invoice={invoice} />
+
+      {hasPermission(role, 'quotes:write') && (
+        <QuoteSharePanel quoteId={quote.id} shareToken={quote.shareToken} expiresAt={quote.expiresAt} />
+      )}
 
       <QuoteLineItemsPanel
         quoteId={quote.id}
