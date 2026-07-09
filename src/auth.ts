@@ -5,7 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
-import type { MembershipRole } from "@prisma/client";
+import type { MembershipRole, PlatformRole } from "@prisma/client";
 
 const LOGIN_ATTEMPT_LIMIT = 5;
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
@@ -57,6 +57,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     authorized({ auth }) {
       return !!auth?.user;
     },
+    async redirect({ url, baseUrl }) {
+      // Funnel every fresh sign-in through the post-auth resolver at /welcome,
+      // unless the caller explicitly requested an in-app path.
+      if (url.startsWith(baseUrl) && !url.includes('/dashboard') && !url.includes('/welcome')) {
+        // Preserve callbackUrl-style same-origin relative redirects; default to /welcome.
+        const path = url.replace(baseUrl, '');
+        if (path === '' || path === '/' || path.startsWith('/login') || path.startsWith('/signup')) {
+          return `${baseUrl}/welcome`;
+        }
+      }
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      if (url.startsWith(baseUrl)) return url;
+      return `${baseUrl}/welcome`;
+    },
     async signIn({ user }) {
       // Consume any pending invites for this email — turns them into real
       // memberships now that the user has completed Google sign-in.
@@ -82,15 +96,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user?.id || !token.memberships) {
         const userId = (user?.id ?? token.sub) as string | undefined;
         if (userId) {
-          const memberships = await prisma.membership.findMany({
-            where: { userId },
-            include: { tenant: { select: { slug: true } } },
-          });
+          const [memberships, dbUser] = await Promise.all([
+            prisma.membership.findMany({
+              where: { userId },
+              include: { tenant: { select: { slug: true } } },
+            }),
+            prisma.user.findUnique({ where: { id: userId }, select: { platformRole: true } }),
+          ]);
           token.memberships = memberships.map((m) => ({
             tenantId: m.tenantId,
             tenantSlug: m.tenant.slug,
             role: m.role,
           })) satisfies SessionMembership[];
+          token.platformRole = dbUser?.platformRole ?? 'user';
         }
       }
       return token;
@@ -98,6 +116,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       session.user.id = token.sub as string;
       session.user.memberships = (token.memberships as SessionMembership[]) ?? [];
+      session.user.platformRole = (token.platformRole as PlatformRole) ?? 'user';
       return session;
     },
   },

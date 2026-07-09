@@ -18,10 +18,19 @@ export type RfqSpec = z.infer<typeof RfqSpecSchema>;
 
 const SYSTEM_PROMPT = `You extract structured RFQ (request-for-quote) specs from buyer emails or documents for an export trading company. Extract only what is explicitly stated; use null (or an empty array for sizes) for anything not mentioned. Do not guess or infer values that are not in the text.`;
 
+const RFQ_EXTRACTION_MODEL = 'claude-opus-4-8';
+
+export type RfqExtractionResult = {
+  spec: RfqSpec;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+};
+
 /** Extracts a structured RFQ spec from raw buyer email/PDF text using Claude. */
-export async function extractRfqSpec(rawText: string): Promise<RfqSpec> {
+export async function extractRfqSpec(rawText: string): Promise<RfqExtractionResult> {
   const response = await anthropic.messages.parse({
-    model: 'claude-opus-4-8',
+    model: RFQ_EXTRACTION_MODEL,
     max_tokens: 2048,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: rawText }],
@@ -34,5 +43,10 @@ export async function extractRfqSpec(rawText: string): Promise<RfqSpec> {
     throw new Error('Could not extract a structured RFQ spec from the provided text');
   }
 
-  return response.parsed_output;
+  return {
+    spec: response.parsed_output,
+    model: response.model,
+    promptTokens: response.usage.input_tokens,
+    completionTokens: response.usage.output_tokens,
+  };
 }

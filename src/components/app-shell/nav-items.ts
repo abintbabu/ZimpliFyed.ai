@@ -2,6 +2,7 @@ import type { AppNavItem } from './types';
 
 export const DASHBOARD_NAV_ITEMS: AppNavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard', exact: true },
+  { label: 'Daily brief', href: '/dashboard/brief', icon: 'Sunrise' },
   { label: 'Copilot', href: '/dashboard/copilot', icon: 'Sparkles' },
   { label: 'Leads', href: '/dashboard/leads', icon: 'Users2' },
   { label: 'Vendors', href: '/dashboard/vendors', icon: 'Truck' },

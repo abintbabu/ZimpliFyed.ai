@@ -4,6 +4,8 @@ import { anthropic } from './anthropic';
 
 export type CopilotMessage = { role: 'user' | 'assistant'; content: string };
 
+const COPILOT_MODEL = 'claude-opus-4-8';
+
 async function buildContext(tenantId: string): Promise<string> {
   const [leads, quotes, orders, invoices] = await Promise.all([
     prisma.lead.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' }, take: 20 }),
@@ -44,16 +46,28 @@ async function buildContext(tenantId: string): Promise<string> {
 
 const SYSTEM_PROMPT = `You are Zimplifyed Copilot, an assistant for an export trading company's CRM/ops platform. Answer questions using only the tenant data provided in the context below — do not invent orders, quotes, or figures that aren't there. If the data needed to answer isn't in the context, say so plainly rather than guessing. Keep answers concise and business-focused (this is a busy trader, not a chat companion).`;
 
-export async function askCopilot(tenantId: string, history: CopilotMessage[]): Promise<string> {
+export type CopilotResult = {
+  text: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+};
+
+export async function askCopilot(tenantId: string, history: CopilotMessage[]): Promise<CopilotResult> {
   const context = await buildContext(tenantId);
 
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-8',
+    model: COPILOT_MODEL,
     max_tokens: 1024,
     system: `${SYSTEM_PROMPT}\n\n# Current tenant data\n${context}`,
     messages: history.map((m) => ({ role: m.role, content: m.content })),
   });
 
   const textBlock = response.content.find((b) => b.type === 'text');
-  return textBlock?.type === 'text' ? textBlock.text : '';
+  return {
+    text: textBlock?.type === 'text' ? textBlock.text : '',
+    model: response.model,
+    promptTokens: response.usage.input_tokens,
+    completionTokens: response.usage.output_tokens,
+  };
 }

@@ -8,6 +8,24 @@ datasource db {
 
 // ─── Tenancy ──────────────────────────────────────────────────────────────
 
+enum PlatformRole {
+  user
+  staff
+  platform_admin
+}
+
+enum BusinessType {
+  merchant
+  manufacturer
+  both
+}
+
+enum AutoJoinMode {
+  off
+  as_viewer
+  require_approval
+}
+
 enum TenantPlan {
   free
   starter
@@ -31,6 +49,15 @@ model Tenant {
 
   logoUrl      String?
   primaryColor String?
+
+  packId         String        @default("in")
+  businessType   BusinessType?
+  exportProducts String?
+  primaryMarkets String[]
+  teamSizeBand   String?
+  autoJoinDomain String?
+  autoJoinMode   AutoJoinMode  @default(off)
+  onboarding     Json?
 
   stripeCustomerId     String? @unique
   stripeSubscriptionId String? @unique
@@ -71,6 +98,9 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
+
+  lastActiveTenantId String?
+  platformRole       PlatformRole @default(user)
 
   accounts    Account[]
   sessions    Session[]
@@ -156,8 +186,13 @@ model Invite {
   id       String         @id @default(cuid())
   tenantId String
   tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  email    String
+  email    String?
   role     MembershipRole
+
+  token     String?   @unique
+  expiresAt DateTime?
+  maxUses   Int?
+  useCount  Int       @default(0)
 
   invitedByUserId String
   acceptedAt      DateTime?
@@ -166,6 +201,15 @@ model Invite {
 
   @@unique([tenantId, email])
   @@index([email])
+}
+
+/** Persistent sliding-window rate limiter (multi-instance safe, replaces the in-memory limiter for auth-critical keys). */
+model RateLimit {
+  key       String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+
+  @@index([resetAt])
 }
 
 // ─── CRM core (first vertical slice) ───────────────────────────────────────
@@ -201,6 +245,7 @@ model Lead {
   id       String @id @default(cuid())
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
 
   source LeadSource
 
@@ -239,6 +284,7 @@ model Vendor {
   id       String @id @default(cuid())
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
 
   name        String
   contactName String?
@@ -377,6 +423,7 @@ model Quote {
   id       String @id @default(cuid())
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
 
   quoteNumber String
   leadId      String?
@@ -435,6 +482,7 @@ model CostSheet {
   id       String @id @default(cuid())
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
 
   quoteId String @unique
   quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
@@ -478,6 +526,7 @@ model Invoice {
   id       String @id @default(cuid())
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
 
   invoiceNumber String
   orderId       String?
@@ -530,6 +579,7 @@ model Order {
   id       String @id @default(cuid())
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
 
   orderNumber String
   status      OrderStatus @default(confirmed)
@@ -628,6 +678,7 @@ model Task {
   id       String @id @default(cuid())
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
 
   title       String
   description String?

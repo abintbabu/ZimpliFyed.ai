@@ -1,9 +1,10 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
-import { askCopilotAction } from '@/actions/ai';
+import { askCopilotAction, submitAiFeedback } from '@/actions/ai';
+import type { AiFeedbackRating } from '@prisma/client';
 
-type Message = { role: 'user' | 'assistant'; content: string };
+type Message = { role: 'user' | 'assistant'; content: string; interactionId?: string };
 
 const SUGGESTIONS = [
   'Which orders ship this week?',
@@ -16,6 +17,7 @@ export function CopilotChat() {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [feedbackGiven, setFeedbackGiven] = useState<Record<string, AiFeedbackRating>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
 
   function send(text: string) {
@@ -27,12 +29,22 @@ export function CopilotChat() {
 
     startTransition(async () => {
       try {
-        const reply = await askCopilotAction(next);
-        setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
+        const { text: reply, interactionId } = await askCopilotAction(next);
+        setMessages((prev) => [...prev, { role: 'assistant', content: reply, interactionId }]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Copilot failed to respond');
       }
+    });
+  }
+
+  function giveFeedback(interactionId: string, rating: AiFeedbackRating) {
+    setFeedbackGiven((prev) => ({ ...prev, [interactionId]: rating }));
+    submitAiFeedback(interactionId, rating).catch(() => {
+      setFeedbackGiven((prev) => {
+        const { [interactionId]: _removed, ...rest } = prev;
+        return rest;
+      });
     });
   }
 
@@ -54,10 +66,28 @@ export function CopilotChat() {
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
-            m.role === 'user' ? 'ml-auto bg-brand text-white' : 'bg-surface text-ink'
-          }`}>
-            {m.content}
+          <div key={i} className={`max-w-[85%] ${m.role === 'user' ? 'ml-auto' : ''}`}>
+            <div className={`rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
+              m.role === 'user' ? 'bg-brand text-white' : 'bg-surface text-ink'
+            }`}>
+              {m.content}
+            </div>
+            {m.role === 'assistant' && m.interactionId && (
+              <div className="mt-1 flex items-center gap-2 px-1 text-xs text-muted">
+                {feedbackGiven[m.interactionId] ? (
+                  <span>Thanks for the feedback.</span>
+                ) : (
+                  <>
+                    <button onClick={() => giveFeedback(m.interactionId!, 'accept')} className="hover:text-ink" title="Helpful">
+                      👍
+                    </button>
+                    <button onClick={() => giveFeedback(m.interactionId!, 'reject')} className="hover:text-ink" title="Not helpful">
+                      👎
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         ))}
         {pending && <div className="max-w-[85%] rounded-2xl bg-surface px-4 py-2 text-sm text-muted">Thinking…</div>}

@@ -1,8 +1,13 @@
 import Link from 'next/link';
+import { auth } from '@/auth';
 import { requireTenantSession } from '@/lib/session-tenant';
+import { TenantSwitcher } from '@/components/onboarding/tenant-switcher';
 import { prisma } from '@/lib/prisma';
 import { complianceStatus } from '@/lib/compliance-deadlines';
 import { claimableIncentiveTotal } from '@/actions/incentive-claims';
+import { computeChecklist } from '@/actions/onboarding';
+import { OnboardingChecklistCard } from '@/components/onboarding/checklist-card';
+import { DemoDataBanner } from '@/components/onboarding/demo-banner';
 
 type FunnelAlert = { href: string; message: string };
 
@@ -53,17 +58,29 @@ async function funnelAlerts(tenantId: string): Promise<FunnelAlert[]> {
 
 export default async function DashboardPage() {
   const { tenantId } = await requireTenantSession();
+  const session = await auth();
+  const memberships = session?.user?.memberships ?? [];
+  const activeSlug = memberships.find((m) => m.tenantId === tenantId)?.tenantSlug ?? '';
 
-  const [leadCount, openTaskCount, alerts, claimableIncentives] = await Promise.all([
+  const [leadCount, openTaskCount, alerts, claimableIncentives, checklist, demoCount] = await Promise.all([
     prisma.lead.count({ where: { tenantId } }),
     prisma.task.count({ where: { tenantId, status: { in: ['open', 'in_progress'] } } }),
     funnelAlerts(tenantId),
     claimableIncentiveTotal(tenantId),
+    computeChecklist(tenantId),
+    prisma.lead.count({ where: { tenantId, isDemo: true } }),
   ]);
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
+        <TenantSwitcher memberships={memberships} activeSlug={activeSlug} />
+      </div>
+
+      {demoCount > 0 && <DemoDataBanner />}
+
+      <OnboardingChecklistCard state={checklist} />
 
       {alerts.length > 0 && (
         <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">

@@ -2,7 +2,7 @@
 
 **The one doc updated weekly.** Everything else describes intent; this records reality. Absorbs MIGRATION_PLAN §7b as the single progress ledger. Conventions: `[x]` shipped & verified · `[~]` in progress · `[ ]` not started · each line names its source doc/section.
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-09_
 
 ---
 
@@ -20,26 +20,26 @@ _Last updated: 2026-07-07_
 - [x] **Phase 0** foundation: shell, audit, permissions matrix, tenant guard (file storage = local flag, see risk R2)
 - [x] **Phase 1** trader MVP: quotes, vendor RFQs (`vendor-rfqs.ts`), cost sheets (`cost-sheets.ts`), orders, invoices, tracking link — *gap: Copilot v1 exists as page, verify depth*
 - [~] **Phase 2** ship & comply: export-documents ✅, hs-codes ✅, compliance ✅, shipment-milestones ✅, screening ✅, letters-of-credit ✅ — *gap: cross-doc consistency AI (needs DOC_ENGINE_SPEC), doc templates beyond first set*
-- [~] **Phase 3** money: incentive-claims ✅, order-pnl ✅ — *gap: e-BRC/FIRC reconciliation, cash-flow forecast, daily founder brief*
+- [~] **Phase 3** money: incentive-claims ✅, order-pnl ✅, daily founder brief ✅ (`founder-brief.ts`, `/dashboard/brief`) — *gap: e-BRC/FIRC reconciliation, cash-flow forecast*
 - [ ] **Phase 4** manufacturer depth: production stages, QC/AQL, packing, sampling, freight desk
 - [ ] **Phase 5** platform: portal imports, integrations, marketplace
 
 ### SELF_SERVE_PLAN phases
-- [ ] **A** self-signup: post-auth resolver, org wizard, seeding, onboarding checklist, magic-link provider, rate limiting → `ONBOARDING_SPEC.md`
-- [ ] **B** roles UX: permission-verb expansion, generated nav, role dashboards, invite links, tenant switcher
-- [ ] **C** billing + lifecycle → `BILLING_SPEC.md`
+- [x] **A** self-signup: post-auth resolver (`post-auth.ts`), org wizard (`/welcome/create`), demo seeding (`seed-demo.ts`), onboarding checklist + demo banner, invite links + bulk invite, domain auto-join, DB-backed rate limiting (`rate-limit-db.ts`), `/join/[token]`, platformRole in session — *gap: magic-link email provider not yet wired (Google + credentials only)*
+- [~] **B** roles UX: tenant switcher ✅ (dashboard) — *gap: permission-verb expansion, generated nav, role dashboards*
+- [~] **C** billing + lifecycle → `BILLING_SPEC.md`: plans/entitlements (`billing/plans.ts`), `requireFeature`+`PlanGateError`, usage rollup off MeterEvent, seat gate on invites, `/dashboard/settings/billing` usage UI — *gap: Razorpay/Stripe adapters, webhooks, lifecycle state machine, export job*
 - [ ] **D** platform admin console, impersonation, flags
 - [ ] **E** growth loops
 
 ### VISION_1B §10 day-one imperatives (architectural debt clock ticking)
-- [ ] CountryPack abstraction before 3rd India-specific doc template → `COUNTRY_PACK_SPEC.md` ⚠ export-documents module already exists; audit template count now
-- [ ] Metering (AI actions, doc-sets, shipments) → `AI_PLATFORM_SPEC.md`
-- [ ] AI feedback capture (accept/edit/reject) → `AI_PLATFORM_SPEC.md`
+- [~] CountryPack abstraction → `COUNTRY_PACK_SPEC.md`: `packs/types.ts` contract, `registry.ts`, `in/` manifest (GSTIN/IEC/PAN validators, compliance seeds, incentive schemes, capabilities), `Tenant.packId` (default `in`), demo seed routes compliance through the pack — *gap: move HS/doc/incentive logic into `in/`, lint guard for `IN`-literals outside packs*
+- [x] Metering (AI actions, doc-sets, shipments) → `AI_PLATFORM_SPEC.md` (schema + `ai/metering.ts` + usage rollup in `billing/entitlements.ts`)
+- [x] AI feedback capture (accept/edit/reject) schema (`AiFeedback`) — *gap: UI to submit ratings*
 - [ ] Audit log → event stream
 - [ ] Golden-file accuracy tests for doc generation → `DOC_ENGINE_SPEC.md`
 
 ### GTM_PLAN quarterly commitments
-- [ ] 2026Q3: positioning/site rewrite, first 200 pages (`SEO_CONTENT_PLAN.md`), HS-finder + landed-cost tools, community #1, 10 design partners
+- [~] 2026Q3: HS-finder (`/tools/hs-finder`) + landed-cost (`/tools/landed-cost`) tools ✅ — *gap: positioning/site rewrite, first 200 pages, community, design partners*
 - [ ] 2026Q4: paid plans live (**depends: SELF_SERVE C**), LC-checker tool, 2 meetups, 50 paying orgs
 
 ### TEAMS_AND_ORG calendar-bound items (externally fixed lead times)
@@ -70,11 +70,11 @@ Legal ToS/Privacy ──→ ANY paid or design-partner signup
 
 | # | Risk | Status | Owner action |
 |---|---|---|---|
-| R1 | ToS/Privacy are `#` links while collecting signups | 🔴 open | legal track §2.1, this sprint |
-| R2 | File storage is `local-storage-flag.ts` — not production-viable | 🔴 open | pick R2/S3 before design partners upload docs |
-| R3 | `super_admin` naming vs owner semantics (SELF_SERVE §1.3) | 🟡 open | relabel in UI during Phase B |
-| R4 | Doc templates accumulating without CountryPack | 🟡 open | audit count; abstraction gate |
-| R5 | No rate limiting on auth/invite | 🟡 open | Phase A scope |
+| R1 | ToS/Privacy links | 🟢 closed | real `/terms` + `/privacy` pages shipped |
+| R2 | File storage production-viability | 🟡 open | `storage.ts` already has S3/R2 adapter with local-disk dev fallback; just set `STORAGE_*` env before design partners upload |
+| R3 | `super_admin` naming vs owner semantics (SELF_SERVE §1.3) | 🟡 open | wizard labels role "Owner" in UI; relabel remaining surfaces in Phase B |
+| R4 | Doc templates accumulating without CountryPack | 🟢 mitigated | CountryPack abstraction landed (`src/packs/`); templates register via pack |
+| R5 | No rate limiting on auth/invite | 🟢 closed | in-memory login limiter + DB-backed limiter (`rate-limit-db.ts`) on signin/invite/orgcreate/slugcheck |
 
 ## 5. Update protocol
 Weekly (with the §4 metrics sheet review): flip checkboxes, re-date the header, add/close risks, move Now/Next/Later. Quarterly: reconcile against GTM calendar and TEAMS triggers; archive completed sections to a `## Done log` at the bottom rather than deleting.
