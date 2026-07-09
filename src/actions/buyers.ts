@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
+import { draftBuyerFollowup } from '@/lib/ai/buyer-followup';
+import { recordAiInteraction } from '@/lib/ai/metering';
 import type { ActivityKind } from '@prisma/client';
 
 export async function listBuyers(tenantId: string) {
@@ -217,4 +219,53 @@ export async function completeActivity(activityId: string) {
 
   await prisma.activity.update({ where: { id: activityId }, data: { doneAt: new Date() } });
   if (activity.entityType === 'buyer') revalidatePath(`/dashboard/buyers/${activity.entityId}`);
+}
+
+/** Drafts a follow-up nudge from a buyer's recent context. The output is a draft only — a human reviews/edits it before it's logged or sent. */
+export async function draftBuyerFollowupAction(buyerId: string) {
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
+  if (!hasPermission(role, 'customers:read')) throw new Error('You do not have permission to view this buyer');
+
+  const buyer = await prisma.buyer.findFirst({
+    where: { id: buyerId, tenantId },
+    include: {
+      quotes: { orderBy: { createdAt: 'desc' }, take: 3 },
+      orders: { orderBy: { createdAt: 'desc' }, take: 3 },
+    },
+  });
+  if (!buyer) throw new Error('Buyer not found');
+
+  const activities = await prisma.activity.findMany({
+    where: { tenantId, entityType: 'buyer', entityId: buyerId },
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+  });
+
+  const context = [
+    `Buyer: ${buyer.name} (${buyer.country ?? 'country unknown'})`,
+    `Payment terms: ${buyer.paymentTermsDefault ?? 'not set'} · Currency: ${buyer.currencyDefault}`,
+    buyer.quotes.length > 0
+      ? `Recent quotes: ${buyer.quotes.map((q) => `${q.quoteNumber} (${q.status}, ${q.currency} ${q.total.toFixed(2)})`).join('; ')}`
+      : 'No quotes yet.',
+    buyer.orders.length > 0
+      ? `Recent orders: ${buyer.orders.map((o) => `${o.orderNumber} (${o.status})`).join('; ')}`
+      : 'No orders yet.',
+    activities.length > 0
+      ? `Recent activity (most recent first): ${activities.map((a) => `[${a.kind}] ${a.subject ?? ''} ${a.body ?? ''}`.trim()).join(' | ')}`
+      : 'No prior activity logged.',
+  ].join('\n');
+
+  const result = await draftBuyerFollowup(context);
+
+  await recordAiInteraction({
+    tenantId,
+    userId: session.userId,
+    feature: 'buyer_followup',
+    model: result.model,
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens,
+  });
+
+  return result.draft;
 }

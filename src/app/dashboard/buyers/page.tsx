@@ -1,8 +1,14 @@
 import Link from 'next/link';
+import { Building2 } from 'lucide-react';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { listBuyers } from '@/actions/buyers';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { DataTable, type DataTableColumn } from '@/components/dashboard/data-table';
+import { EmptyState } from '@/components/dashboard/empty-state';
 import { NewBuyerForm } from './new-buyer-form';
+
+type Buyer = Awaited<ReturnType<typeof listBuyers>>[number];
 
 export default async function BuyersPage() {
   const { tenantId, role } = await requireTenantSession();
@@ -13,48 +19,39 @@ export default async function BuyersPage() {
   const canWrite = hasPermission(role, 'customers:write');
   const buyers = await listBuyers(tenantId);
 
+  const columns: DataTableColumn<Buyer>[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      render: (b) => (
+        <Link href={`/dashboard/buyers/${b.id}`} className="font-medium text-ink hover:text-brand transition-colors">
+          {b.name}
+        </Link>
+      ),
+    },
+    { key: 'country', header: 'Country', render: (b) => b.country ?? '—' },
+    { key: 'contacts', header: 'Contacts', numeric: true, render: (b) => b.contacts.length },
+    { key: 'quotes', header: 'Quotes', numeric: true, render: (b) => b._count.quotes },
+    { key: 'orders', header: 'Orders', numeric: true, render: (b) => b._count.orders },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Buyers</h1>
-        {canWrite && <NewBuyerForm />}
-      </div>
+      <PageHeader title="Buyers" description="Your customer accounts and their deal history." actions={canWrite && <NewBuyerForm />} />
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-black/[0.02] text-left text-xs font-semibold uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Country</th>
-              <th className="px-4 py-3">Contacts</th>
-              <th className="px-4 py-3">Quotes</th>
-              <th className="px-4 py-3">Orders</th>
-            </tr>
-          </thead>
-          <tbody>
-            {buyers.map((b) => (
-              <tr key={b.id} className="border-t border-line">
-                <td className="px-4 py-3">
-                  <Link href={`/dashboard/buyers/${b.id}`} className="font-medium text-ink hover:underline">
-                    {b.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-muted">{b.country ?? '—'}</td>
-                <td className="px-4 py-3 text-muted">{b.contacts.length}</td>
-                <td className="px-4 py-3 text-muted">{b._count.quotes}</td>
-                <td className="px-4 py-3 text-muted">{b._count.orders}</td>
-              </tr>
-            ))}
-            {buyers.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted">
-                  No buyers yet. Convert a lead or create one directly.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={buyers}
+        rowKey={(b) => b.id}
+        empty={
+          <EmptyState
+            icon={Building2}
+            title="No buyers yet"
+            description="Convert a lead or create a buyer directly."
+            action={canWrite && <NewBuyerForm />}
+          />
+        }
+      />
     </div>
   );
 }

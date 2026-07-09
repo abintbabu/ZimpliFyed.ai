@@ -31,8 +31,20 @@
   /* Sky accent — AI/tech energy without warmth */
   --color-sky: #0ea5e9;
 
-  /* Status */
+  /* Status — soft bg + solid fg pairs, used by Badge/StatCard/alerts */
   --color-success: #059669;
+  --color-success-soft: #ecfdf5;
+  --color-warning: #d97706;
+  --color-warning-soft: #fffbeb;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+  --color-info: #0284c7;
+  --color-info-soft: #f0f9ff;
+
+  /* Elevation — enterprise-grade, not marketing-glow */
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-raised: 0 4px 12px rgba(15, 23, 42, 0.06), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --shadow-popover: 0 12px 32px -8px rgba(15, 23, 42, 0.18), 0 4px 12px -4px rgba(15, 23, 42, 0.08);
 
   /* Type */
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
@@ -47,6 +59,25 @@
 :root {
   /* Deep navy → indigo → sky — cool, trustworthy, technological */
   --gradient-brand: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #0ea5e9 100%);
+}
+
+.dark {
+  --color-canvas: #0a0f1e;
+  --color-surface: #0f172a;
+  --color-surface-2: #1e293b;
+  --color-ink: #f1f5f9;
+  --color-ink-soft: #cbd5e1;
+  --color-muted: #94a3b8;
+  --color-line: #1e293b;
+  --color-line-soft: #172033;
+  --color-brand-soft: #17233e;
+  --color-success-soft: #062119;
+  --color-warning-soft: #241a05;
+  --color-danger-soft: #260b0b;
+  --color-info-soft: #051b28;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-raised: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-popover: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 4px 12px -4px rgba(0, 0, 0, 0.4);
 }
 
 * {

@@ -15,6 +15,13 @@ export async function listIncentiveClaims(tenantId: string) {
   });
 }
 
+export async function getIncentiveClaim(tenantId: string, id: string) {
+  return prisma.incentiveClaim.findFirst({
+    where: { id, tenantId },
+    include: { order: { select: { id: true, orderNumber: true } } },
+  });
+}
+
 export async function claimableIncentiveTotal(tenantId: string) {
   const result = await prisma.incentiveClaim.aggregate({
     where: { tenantId, status: 'claimable' },
@@ -32,7 +39,7 @@ export async function createIncentiveClaim(input: {
 }) {
   const session = await requireTenantSession();
   const { tenantId, role } = session;
-  if (!hasPermission(role, 'invoices:write')) throw new Error('You do not have permission to track incentive claims');
+  if (!hasPermission(role, 'incentives:write')) throw new Error('You do not have permission to track incentive claims');
   if (input.amount <= 0) throw new Error('Amount must be greater than zero');
 
   const order = await prisma.order.findFirst({ where: { id: input.orderId, tenantId } });
@@ -65,7 +72,7 @@ export async function createIncentiveClaim(input: {
 export async function updateIncentiveClaimStatus(id: string, status: IncentiveClaimStatus) {
   const session = await requireTenantSession();
   const { tenantId, role } = session;
-  if (!hasPermission(role, 'invoices:write')) throw new Error('You do not have permission to update incentive claims');
+  if (!hasPermission(role, 'incentives:write')) throw new Error('You do not have permission to update incentive claims');
 
   const before = await prisma.incentiveClaim.findFirst({ where: { id, tenantId } });
   if (!before) throw new Error('Incentive claim not found');

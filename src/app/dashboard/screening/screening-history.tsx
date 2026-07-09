@@ -1,10 +1,8 @@
+import { ShieldAlert } from 'lucide-react';
+import { DataTable, type DataTableColumn } from '@/components/dashboard/data-table';
+import { Badge, statusTone } from '@/components/dashboard/badge';
+import { EmptyState } from '@/components/dashboard/empty-state';
 import type { ScreeningCheck } from '@prisma/client';
-
-const RESULT_STYLES: Record<string, string> = {
-  clear: 'bg-green-100 text-green-700',
-  potential_match: 'bg-red-100 text-red-700',
-  manual_attestation: 'bg-surface text-muted',
-};
 
 const RESULT_LABELS: Record<string, string> = {
   clear: 'Clear',
@@ -13,37 +11,28 @@ const RESULT_LABELS: Record<string, string> = {
 };
 
 export function ScreeningHistory({ checks }: { checks: ScreeningCheck[] }) {
+  const columns: DataTableColumn<ScreeningCheck>[] = [
+    { key: 'subjectName', header: 'Subject', render: (c) => <span className="font-medium text-ink">{c.subjectName}</span> },
+    { key: 'country', header: 'Country', render: (c) => c.country ?? '—' },
+    {
+      key: 'result',
+      header: 'Result',
+      render: (c) => (
+        <Badge tone={statusTone(c.result)} dot>
+          {RESULT_LABELS[c.result] ?? c.result}
+        </Badge>
+      ),
+    },
+    { key: 'source', header: 'Source', render: (c) => c.source },
+    { key: 'checkedAt', header: 'Checked', render: (c) => new Date(c.checkedAt).toLocaleString() },
+  ];
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-black/[0.02] text-left text-xs font-semibold uppercase tracking-wide text-muted">
-          <tr>
-            <th className="px-4 py-3">Subject</th>
-            <th className="px-4 py-3">Country</th>
-            <th className="px-4 py-3">Result</th>
-            <th className="px-4 py-3">Source</th>
-            <th className="px-4 py-3">Checked</th>
-          </tr>
-        </thead>
-        <tbody>
-          {checks.map((c) => (
-            <tr key={c.id} className="border-t border-line">
-              <td className="px-4 py-3 text-ink">{c.subjectName}</td>
-              <td className="px-4 py-3 text-muted">{c.country ?? '—'}</td>
-              <td className="px-4 py-3">
-                <span className={`rounded px-2 py-0.5 text-xs font-medium ${RESULT_STYLES[c.result]}`}>
-                  {RESULT_LABELS[c.result]}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-muted">{c.source}</td>
-              <td className="px-4 py-3 text-muted">{new Date(c.checkedAt).toLocaleString()}</td>
-            </tr>
-          ))}
-          {checks.length === 0 && (
-            <tr><td colSpan={5} className="px-4 py-8 text-center text-muted">No screening checks recorded yet.</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      columns={columns}
+      rows={checks}
+      rowKey={(c) => c.id}
+      empty={<EmptyState icon={ShieldAlert} title="No screening checks recorded yet" description="Sanctions and denied-party screening results will appear here." />}
+    />
   );
 }

@@ -45,7 +45,11 @@ export type Permission =
   | 'tasks:read'
   | 'tasks:write'
   | 'compliance:read'
-  | 'compliance:write';
+  | 'compliance:write'
+  | 'hs_codes:read'
+  | 'hs_codes:write'
+  | 'incentives:read'
+  | 'incentives:write';
 
 const ALL_STAFF: Permission[] = [
   'customers:read', 'customers:write', 'leads:read', 'leads:write', 'quotes:read', 'quotes:write',
@@ -53,14 +57,15 @@ const ALL_STAFF: Permission[] = [
   'samples:dispatch', 'samples:inventory', 'samples:reconcile', 'analytics:read', 'kanban:read',
   'kanban:write', 'expenses:read', 'expenses:write', 'expenses:delete', 'vendors:read', 'vendors:write',
   'products:read', 'products:write', 'tasks:read', 'tasks:write', 'compliance:read', 'compliance:write',
+  'hs_codes:read', 'hs_codes:write', 'incentives:read', 'incentives:write',
 ];
 
 export const ROLE_PERMISSIONS: Record<MembershipRole, Permission[]> = {
   customer: [],
   vendor: [],
-  viewer: ['customers:read', 'leads:read', 'quotes:read', 'orders:read', 'invoices:read', 'samples:read', 'analytics:read', 'kanban:read', 'tasks:read', 'compliance:read', 'products:read'],
-  sales: ['customers:read', 'customers:write', 'leads:read', 'leads:write', 'quotes:read', 'quotes:write', 'orders:read', 'samples:read', 'samples:dispatch', 'kanban:read', 'kanban:write', 'vendors:read', 'tasks:read', 'tasks:write', 'products:read', 'products:write'],
-  finance: ['customers:read', 'orders:read', 'invoices:read', 'invoices:write', 'analytics:read', 'expenses:read', 'expenses:write', 'vendors:read', 'vendors:write', 'tasks:read', 'compliance:read', 'compliance:write', 'products:read'],
+  viewer: ['customers:read', 'leads:read', 'quotes:read', 'orders:read', 'invoices:read', 'samples:read', 'analytics:read', 'kanban:read', 'tasks:read', 'compliance:read', 'products:read', 'hs_codes:read', 'incentives:read'],
+  sales: ['customers:read', 'customers:write', 'leads:read', 'leads:write', 'quotes:read', 'quotes:write', 'orders:read', 'samples:read', 'samples:dispatch', 'kanban:read', 'kanban:write', 'vendors:read', 'tasks:read', 'tasks:write', 'products:read', 'products:write', 'hs_codes:read', 'hs_codes:write'],
+  finance: ['customers:read', 'orders:read', 'invoices:read', 'invoices:write', 'analytics:read', 'expenses:read', 'expenses:write', 'vendors:read', 'vendors:write', 'tasks:read', 'compliance:read', 'compliance:write', 'products:read', 'incentives:read', 'incentives:write'],
   procurement: ['samples:read', 'samples:write', 'samples:inventory', 'samples:reconcile', 'orders:read', 'tasks:read', 'products:read'],
   production: ['orders:read', 'orders:write', 'kanban:read', 'kanban:write', 'tasks:read', 'products:read'],
   logistics: ['orders:read', 'orders:write', 'samples:read', 'samples:dispatch', 'tasks:read', 'compliance:read', 'products:read'],

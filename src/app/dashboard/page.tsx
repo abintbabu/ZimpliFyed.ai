@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AlertTriangle, PiggyBank, Users2, CheckSquare, ArrowRight } from 'lucide-react';
 import { auth } from '@/auth';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { TenantSwitcher } from '@/components/onboarding/tenant-switcher';
@@ -8,6 +9,9 @@ import { claimableIncentiveTotal } from '@/actions/incentive-claims';
 import { computeChecklist } from '@/actions/onboarding';
 import { OnboardingChecklistCard } from '@/components/onboarding/checklist-card';
 import { DemoDataBanner } from '@/components/onboarding/demo-banner';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { StatCard } from '@/components/dashboard/stat-card';
+import { Card, CardHeader } from '@/components/dashboard/card';
 
 type FunnelAlert = { href: string; message: string };
 
@@ -73,40 +77,53 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
-        <TenantSwitcher memberships={memberships} activeSlug={activeSlug} />
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description="Your export operation at a glance."
+        actions={<TenantSwitcher memberships={memberships} activeSlug={activeSlug} />}
+      />
 
       {demoCount > 0 && <DemoDataBanner />}
 
       <OnboardingChecklistCard state={checklist} />
 
-      {alerts.length > 0 && (
-        <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Attention needed</p>
-          {alerts.map((a, i) => (
-            <Link key={i} href={a.href} className="block text-sm text-amber-900 hover:underline">
-              {a.message}
-            </Link>
-          ))}
-        </div>
-      )}
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-line bg-white p-6">
-          <p className="text-sm text-muted">Leads</p>
-          <p className="mt-1 text-3xl font-semibold text-ink">{leadCount}</p>
-        </div>
-        <div className="rounded-2xl border border-line bg-white p-6">
-          <p className="text-sm text-muted">Open tasks</p>
-          <p className="mt-1 text-3xl font-semibold text-ink">{openTaskCount}</p>
-        </div>
-        <Link href="/dashboard/incentives" className="rounded-2xl border border-line bg-white p-6 hover:border-brand">
-          <p className="text-sm text-muted">Incentives claimable</p>
-          <p className="mt-1 text-3xl font-semibold text-amber-700">{claimableIncentives.toFixed(2)}</p>
-        </Link>
+        <StatCard label="Leads" value={leadCount} icon={Users2} href="/dashboard/leads" />
+        <StatCard label="Open tasks" value={openTaskCount} icon={CheckSquare} href="/dashboard/tasks" />
+        <StatCard
+          label="Incentives claimable"
+          value={claimableIncentives.toFixed(2)}
+          icon={PiggyBank}
+          tone="warning"
+          href="/dashboard/incentives"
+        />
       </div>
+
+      {alerts.length > 0 && (
+        <Card padded={false}>
+          <div className="border-b border-line-soft px-5 py-4">
+            <CardHeader
+              title="Needs attention"
+              description={`${alerts.length} item${alerts.length > 1 ? 's' : ''} stalling in the pipeline`}
+            />
+          </div>
+          <div className="divide-y divide-line-soft">
+            {alerts.map((a, i) => (
+              <Link
+                key={i}
+                href={a.href}
+                className="group flex items-center gap-3 px-5 py-3.5 text-sm transition-colors hover:bg-warning-soft"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-warning-soft text-warning">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                </span>
+                <span className="flex-1 text-ink-soft group-hover:text-ink">{a.message}</span>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

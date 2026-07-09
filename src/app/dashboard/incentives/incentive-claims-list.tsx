@@ -1,19 +1,17 @@
 'use client';
 
 import { useTransition } from 'react';
+import { HandCoins } from 'lucide-react';
 import { updateIncentiveClaimStatus } from '@/actions/incentive-claims';
+import { DataTable, type DataTableColumn } from '@/components/dashboard/data-table';
+import { Badge, statusTone } from '@/components/dashboard/badge';
+import { EmptyState } from '@/components/dashboard/empty-state';
 import type { IncentiveClaimStatus, IncentiveType } from '@prisma/client';
 
 const TYPE_LABELS: Record<IncentiveType, string> = {
   rodtep: 'RoDTEP',
   drawback: 'Duty drawback',
   epcg_obligation: 'EPCG obligation',
-};
-
-const STATUS_STYLES: Record<IncentiveClaimStatus, string> = {
-  claimable: 'bg-amber-100 text-amber-700',
-  claimed: 'bg-blue-100 text-blue-700',
-  received: 'bg-green-100 text-green-700',
 };
 
 const NEXT_STATUS: Partial<Record<IncentiveClaimStatus, IncentiveClaimStatus>> = {
@@ -34,50 +32,48 @@ type Claim = {
 export function IncentiveClaimsList({ claims, canWrite }: { claims: Claim[]; canWrite: boolean }) {
   const [pending, startTransition] = useTransition();
 
+  const columns: DataTableColumn<Claim>[] = [
+    { key: 'order', header: 'Order', render: (c) => <span className="font-medium text-ink">{c.order.orderNumber}</span> },
+    { key: 'type', header: 'Type', render: (c) => TYPE_LABELS[c.type] },
+    { key: 'amount', header: 'Amount', numeric: true, render: (c) => <span className="text-ink">{c.currency} {c.amount.toFixed(2)}</span> },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (c) => (
+        <Badge tone={statusTone(c.status)} dot>
+          {c.status}
+        </Badge>
+      ),
+    },
+    ...(canWrite
+      ? [
+          {
+            key: 'actions',
+            header: '',
+            align: 'right' as const,
+            render: (c: Claim) => {
+              const next = NEXT_STATUS[c.status];
+              return next ? (
+                <button
+                  disabled={pending}
+                  onClick={() => startTransition(async () => { await updateIncentiveClaimStatus(c.id, next); })}
+                  className="text-xs font-medium text-brand hover:underline disabled:opacity-50"
+                >
+                  Mark {next}
+                </button>
+              ) : null;
+            },
+          },
+        ]
+      : []),
+  ];
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-black/[0.02] text-left text-xs font-semibold uppercase tracking-wide text-muted">
-          <tr>
-            <th className="px-4 py-3">Order</th>
-            <th className="px-4 py-3">Type</th>
-            <th className="px-4 py-3">Amount</th>
-            <th className="px-4 py-3">Status</th>
-            {canWrite && <th className="px-4 py-3" />}
-          </tr>
-        </thead>
-        <tbody>
-          {claims.map((c) => {
-            const next = NEXT_STATUS[c.status];
-            return (
-              <tr key={c.id} className="border-t border-line">
-                <td className="px-4 py-3 text-ink">{c.order.orderNumber}</td>
-                <td className="px-4 py-3 text-muted">{TYPE_LABELS[c.type]}</td>
-                <td className="px-4 py-3 text-ink">{c.currency} {c.amount.toFixed(2)}</td>
-                <td className="px-4 py-3">
-                  <span className={`rounded px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[c.status]}`}>{c.status}</span>
-                </td>
-                {canWrite && (
-                  <td className="px-4 py-3 text-right">
-                    {next && (
-                      <button
-                        disabled={pending}
-                        onClick={() => startTransition(async () => { await updateIncentiveClaimStatus(c.id, next); })}
-                        className="text-xs font-medium text-brand hover:underline disabled:opacity-50"
-                      >
-                        Mark {next}
-                      </button>
-                    )}
-                  </td>
-                )}
-              </tr>
-            );
-          })}
-          {claims.length === 0 && (
-            <tr><td colSpan={canWrite ? 5 : 4} className="px-4 py-8 text-center text-muted">No incentive claims tracked yet.</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      columns={columns}
+      rows={claims}
+      rowKey={(c) => c.id}
+      empty={<EmptyState icon={HandCoins} title="No incentive claims tracked yet" description="Claims appear here once orders are eligible for RoDTEP, drawback, or EPCG." />}
+    />
   );
 }

@@ -6,6 +6,7 @@ import { AppSidebar, useSidebarCollapse } from './app-sidebar';
 import { AppMobileNav } from './app-mobile-nav';
 import { trackAppPath } from './back-button';
 import { usePanelTheme } from './use-panel-theme';
+import { CommandPalette } from './command-palette';
 import type { AppNavItem } from './types';
 
 type AppShellProps = {
@@ -61,6 +62,8 @@ export function AppShell({
       <main className="flex-1 min-w-0 overflow-x-clip px-4 lg:px-8 pb-10 pt-[76px] lg:pt-8">
         {children}
       </main>
+
+      <CommandPalette navItems={navItems} />
     </div>
   );
 }

@@ -3,6 +3,9 @@
 import { useState, useTransition } from 'react';
 import { lookupHsCode } from '@/actions/hs-codes';
 import type { HsCode } from '@prisma/client';
+import { DataTable, type DataTableColumn } from '@/components/dashboard/data-table';
+import { EmptyState } from '@/components/dashboard/empty-state';
+import { FileSearch } from 'lucide-react';
 
 export function HsCodeLookup({ initialHistory }: { initialHistory: HsCode[] }) {
   const [description, setDescription] = useState('');
@@ -23,9 +26,17 @@ export function HsCodeLookup({ initialHistory }: { initialHistory: HsCode[] }) {
     });
   }
 
+  const columns: DataTableColumn<HsCode>[] = [
+    { key: 'description', header: 'Description', render: (h) => h.description },
+    { key: 'hsCode', header: 'HS code', render: (h) => <span className="font-medium text-ink">{h.hsCode}</span> },
+    { key: 'dutyRatePct', header: 'Duty %', numeric: true, render: (h) => h.dutyRatePct ?? '—' },
+    { key: 'rodtepRatePct', header: 'RoDTEP %', numeric: true, render: (h) => h.rodtepRatePct ?? '—' },
+    { key: 'rationale', header: 'Rationale', render: (h) => h.rationale },
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-line bg-white p-4">
+      <div className="rounded-2xl border border-line bg-canvas p-4">
         <div className="flex gap-2">
           <input
             value={description}
@@ -44,33 +55,12 @@ export function HsCodeLookup({ initialHistory }: { initialHistory: HsCode[] }) {
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-black/[0.02] text-left text-xs font-semibold uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Description</th>
-              <th className="px-4 py-3">HS code</th>
-              <th className="px-4 py-3">Duty %</th>
-              <th className="px-4 py-3">RoDTEP %</th>
-              <th className="px-4 py-3">Rationale</th>
-            </tr>
-          </thead>
-          <tbody>
-            {history.map((h) => (
-              <tr key={h.id} className="border-t border-line align-top">
-                <td className="px-4 py-3 text-ink">{h.description}</td>
-                <td className="px-4 py-3 font-medium text-ink">{h.hsCode}</td>
-                <td className="px-4 py-3 text-muted">{h.dutyRatePct ?? '—'}</td>
-                <td className="px-4 py-3 text-muted">{h.rodtepRatePct ?? '—'}</td>
-                <td className="px-4 py-3 text-muted">{h.rationale}</td>
-              </tr>
-            ))}
-            {history.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted">No lookups yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={history}
+        rowKey={(h) => h.id}
+        empty={<EmptyState icon={FileSearch} title="No lookups yet" description="Classify a product description to see its HS code, duty, and RoDTEP rate." />}
+      />
     </div>
   );
 }

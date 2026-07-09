@@ -1,7 +1,14 @@
 import Link from 'next/link';
+import { Package } from 'lucide-react';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { listOrders } from '@/actions/orders';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { DataTable, type DataTableColumn } from '@/components/dashboard/data-table';
+import { Badge, statusTone } from '@/components/dashboard/badge';
+import { EmptyState } from '@/components/dashboard/empty-state';
+
+type Order = Awaited<ReturnType<typeof listOrders>>[number];
 
 export default async function OrdersPage() {
   const { tenantId, role } = await requireTenantSession();
@@ -11,39 +18,47 @@ export default async function OrdersPage() {
 
   const orders = await listOrders(tenantId);
 
+  const columns: DataTableColumn<Order>[] = [
+    {
+      key: 'orderNumber',
+      header: 'Order #',
+      render: (o) => (
+        <Link href={`/dashboard/orders/${o.id}`} className="font-medium text-ink hover:text-brand transition-colors">
+          {o.orderNumber}
+        </Link>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (o) => (
+        <Badge tone={statusTone(o.status)} dot>
+          {o.status.replace('_', ' ')}
+        </Badge>
+      ),
+    },
+    { key: 'product', header: 'Product', render: (o) => o.product ?? '—' },
+    {
+      key: 'invoiced',
+      header: 'Invoiced',
+      render: (o) => (
+        <Badge tone={o.invoices.length > 0 ? 'success' : 'neutral'}>
+          {o.invoices.length > 0 ? 'Yes' : 'No'}
+        </Badge>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-ink">Orders</h1>
+      <PageHeader title="Orders" description="Confirmed orders moving through fulfillment and invoicing." />
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-black/[0.02] text-left text-xs font-semibold uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Order #</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Product</th>
-              <th className="px-4 py-3">Invoiced</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map((o) => (
-              <tr key={o.id} className="border-t border-line">
-                <td className="px-4 py-3">
-                  <Link href={`/dashboard/orders/${o.id}`} className="font-medium text-ink hover:underline">{o.orderNumber}</Link>
-                </td>
-                <td className="px-4 py-3 text-muted capitalize">{o.status.replace('_', ' ')}</td>
-                <td className="px-4 py-3 text-muted">{o.product ?? '—'}</td>
-                <td className="px-4 py-3 text-muted">{o.invoices.length > 0 ? 'Yes' : 'No'}</td>
-              </tr>
-            ))}
-            {orders.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-muted">No orders yet.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={orders}
+        rowKey={(o) => o.id}
+        empty={<EmptyState icon={Package} title="No orders yet" description="Orders appear here once a quote is accepted." />}
+      />
     </div>
   );
 }

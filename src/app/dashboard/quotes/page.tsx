@@ -1,10 +1,17 @@
 import Link from 'next/link';
+import { FileText } from 'lucide-react';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { listQuotes } from '@/actions/quotes';
 import { listBuyers } from '@/actions/buyers';
 import { listProducts } from '@/actions/products';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { DataTable, type DataTableColumn } from '@/components/dashboard/data-table';
+import { Badge, statusTone } from '@/components/dashboard/badge';
+import { EmptyState } from '@/components/dashboard/empty-state';
 import { NewQuoteForm } from './new-quote-form';
+
+type Quote = Awaited<ReturnType<typeof listQuotes>>[number];
 
 export default async function QuotesPage() {
   const { tenantId, role } = await requireTenantSession();
@@ -19,50 +26,56 @@ export default async function QuotesPage() {
     canWrite ? listProducts(tenantId) : Promise.resolve([]),
   ]);
 
+  const columns: DataTableColumn<Quote>[] = [
+    {
+      key: 'quoteNumber',
+      header: 'Quote #',
+      render: (q) => (
+        <Link href={`/dashboard/quotes/${q.id}`} className="font-medium text-ink hover:text-brand transition-colors">
+          {q.quoteNumber}
+        </Link>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (q) => (
+        <Badge tone={statusTone(q.status)} dot>
+          {q.status}
+        </Badge>
+      ),
+    },
+    { key: 'total', header: 'Total', numeric: true, render: (q) => `${q.currency} ${q.total.toFixed(2)}` },
+    {
+      key: 'margin',
+      header: 'Margin %',
+      numeric: true,
+      render: (q) => (q.overallMarginPct != null ? `${q.overallMarginPct}%` : '—'),
+    },
+    { key: 'order', header: 'Order', render: (q) => (q.orderId ? 'Linked' : '—') },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Quotes</h1>
-        {canWrite && (
-          <NewQuoteForm
-            buyers={buyers.map((b) => ({ id: b.id, name: b.name }))}
-            products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name }))}
-            canOverrideMarginFloor={role === 'admin' || role === 'super_admin'}
-          />
-        )}
-      </div>
+      <PageHeader
+        title="Quotes"
+        actions={
+          canWrite && (
+            <NewQuoteForm
+              buyers={buyers.map((b) => ({ id: b.id, name: b.name }))}
+              products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name }))}
+              canOverrideMarginFloor={role === 'admin' || role === 'super_admin'}
+            />
+          )
+        }
+      />
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-black/[0.02] text-left text-xs font-semibold uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Quote #</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Total</th>
-              <th className="px-4 py-3">Margin %</th>
-              <th className="px-4 py-3">Order</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quotes.map((q) => (
-              <tr key={q.id} className="border-t border-line">
-                <td className="px-4 py-3">
-                  <Link href={`/dashboard/quotes/${q.id}`} className="font-medium text-ink hover:underline">{q.quoteNumber}</Link>
-                </td>
-                <td className="px-4 py-3 text-muted capitalize">{q.status}</td>
-                <td className="px-4 py-3 text-muted">{q.currency} {q.total.toFixed(2)}</td>
-                <td className="px-4 py-3 text-muted">{q.overallMarginPct != null ? `${q.overallMarginPct}%` : '—'}</td>
-                <td className="px-4 py-3 text-muted">{q.orderId ? 'Linked' : '—'}</td>
-              </tr>
-            ))}
-            {quotes.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted">No quotes yet.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={quotes}
+        rowKey={(q) => q.id}
+        empty={<EmptyState icon={FileText} title="No quotes yet" description="Quotes you create for buyers will appear here." />}
+      />
     </div>
   );
 }

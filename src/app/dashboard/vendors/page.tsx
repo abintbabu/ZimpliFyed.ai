@@ -1,8 +1,14 @@
 import Link from 'next/link';
+import { Truck } from 'lucide-react';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { listVendors } from '@/actions/vendors';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { DataTable, type DataTableColumn } from '@/components/dashboard/data-table';
+import { EmptyState } from '@/components/dashboard/empty-state';
 import { NewVendorForm } from './new-vendor-form';
+
+type Vendor = Awaited<ReturnType<typeof listVendors>>[number];
 
 export default async function VendorsPage() {
   const { tenantId, role } = await requireTenantSession();
@@ -13,42 +19,37 @@ export default async function VendorsPage() {
   const canWrite = hasPermission(role, 'vendors:write');
   const vendors = await listVendors(tenantId);
 
+  const columns: DataTableColumn<Vendor>[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      render: (v) => (
+        <Link href={`/dashboard/vendors/${v.id}`} className="font-medium text-ink hover:text-brand transition-colors">
+          {v.name}
+        </Link>
+      ),
+    },
+    { key: 'contact', header: 'Contact', render: (v) => v.contactName ?? v.email ?? '—' },
+    { key: 'rates', header: 'Rates', numeric: true, render: (v) => v.rates.length },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Vendors</h1>
-        {canWrite && <NewVendorForm />}
-      </div>
+      <PageHeader title="Vendors" actions={canWrite && <NewVendorForm />} />
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-black/[0.02] text-left text-xs font-semibold uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Contact</th>
-              <th className="px-4 py-3">Rates</th>
-            </tr>
-          </thead>
-          <tbody>
-            {vendors.map((v) => (
-              <tr key={v.id} className="border-t border-line">
-                <td className="px-4 py-3">
-                  <Link href={`/dashboard/vendors/${v.id}`} className="font-medium text-ink hover:underline">
-                    {v.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-muted">{v.contactName ?? v.email ?? '—'}</td>
-                <td className="px-4 py-3 text-muted">{v.rates.length}</td>
-              </tr>
-            ))}
-            {vendors.length === 0 && (
-              <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-muted">No vendors yet.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={vendors}
+        rowKey={(v) => v.id}
+        empty={
+          <EmptyState
+            icon={Truck}
+            title="No vendors yet"
+            description="Add vendors to start sourcing quotes and RFQs."
+            action={canWrite && <NewVendorForm />}
+          />
+        }
+      />
     </div>
   );
 }

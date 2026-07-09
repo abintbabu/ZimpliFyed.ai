@@ -1,7 +1,14 @@
 import Link from 'next/link';
+import { Receipt } from 'lucide-react';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { listInvoices } from '@/actions/invoices';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { DataTable, type DataTableColumn } from '@/components/dashboard/data-table';
+import { Badge, statusTone } from '@/components/dashboard/badge';
+import { EmptyState } from '@/components/dashboard/empty-state';
+
+type Invoice = Awaited<ReturnType<typeof listInvoices>>[number];
 
 function isOverdue(dueDate: Date | null, balanceDue: number, isCreditOrDebitNote: boolean) {
   return !isCreditOrDebitNote && balanceDue > 0 && !!dueDate && dueDate.getTime() < Date.now();
@@ -15,44 +22,51 @@ export default async function InvoicesPage() {
 
   const invoices = await listInvoices(tenantId);
 
+  const columns: DataTableColumn<Invoice>[] = [
+    {
+      key: 'invoiceNumber',
+      header: 'Invoice #',
+      render: (inv) => (
+        <Link href={`/dashboard/invoices/${inv.id}`} className="font-medium text-ink hover:text-brand transition-colors">
+          {inv.invoiceNumber}
+        </Link>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (inv) => (
+        <Badge tone={statusTone(inv.status)} dot>
+          {inv.status.replace('_', ' ')}
+        </Badge>
+      ),
+    },
+    {
+      key: 'balanceDue',
+      header: 'Balance due',
+      numeric: true,
+      render: (inv) => (
+        <span className="inline-flex items-center gap-2">
+          {inv.currency} {inv.balanceDue.toFixed(2)}
+          {isOverdue(inv.dueDate, inv.balanceDue, inv.isCreditOrDebitNote) && (
+            <Badge tone="danger">overdue</Badge>
+          )}
+        </span>
+      ),
+    },
+    { key: 'dueDate', header: 'Due date', render: (inv) => (inv.dueDate ? inv.dueDate.toLocaleDateString() : '—') },
+  ];
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-ink">Invoices</h1>
+      <PageHeader title="Invoices" />
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-black/[0.02] text-left text-xs font-semibold uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Invoice #</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Balance due</th>
-              <th className="px-4 py-3">Due date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map((inv) => (
-              <tr key={inv.id} className="border-t border-line">
-                <td className="px-4 py-3">
-                  <Link href={`/dashboard/invoices/${inv.id}`} className="font-medium text-ink hover:underline">{inv.invoiceNumber}</Link>
-                </td>
-                <td className="px-4 py-3 text-muted capitalize">{inv.status}</td>
-                <td className="px-4 py-3 text-muted">
-                  {inv.currency} {inv.balanceDue.toFixed(2)}
-                  {isOverdue(inv.dueDate, inv.balanceDue, inv.isCreditOrDebitNote) && (
-                    <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-600">overdue</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-muted">{inv.dueDate ? inv.dueDate.toLocaleDateString() : '—'}</td>
-              </tr>
-            ))}
-            {invoices.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-muted">No invoices yet.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={invoices}
+        rowKey={(inv) => inv.id}
+        empty={<EmptyState icon={Receipt} title="No invoices yet" description="Invoices you issue against orders will appear here." />}
+      />
     </div>
   );
 }

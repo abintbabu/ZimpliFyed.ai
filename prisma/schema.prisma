@@ -988,6 +988,8 @@ model IncentiveClaim {
 enum AiFeature {
   copilot
   rfq_extraction
+  buyer_followup
+  quote_negotiation
 }
 
 enum AiFeedbackRating {

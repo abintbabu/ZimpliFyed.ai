@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronRight, LogOut, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { ChevronRight, LogOut, PanelLeftClose, PanelLeft, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createLocalStorageFlag } from '@/lib/local-storage-flag';
 import { DarkModeToggle } from './dark-mode-toggle';
@@ -161,6 +161,25 @@ export function AppSidebar({
           className="p-1.5 rounded-lg text-ink/40 dark:text-gray-500 hover:text-ink dark:hover:text-white hover:bg-ink/5 dark:hover:bg-white/5 transition-all"
         >
           {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+        </button>
+      </div>
+
+      <div className={cn('px-2 pt-3', collapsed && 'flex justify-center')}>
+        <button
+          onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+          title={collapsed ? 'Search (⌘K)' : undefined}
+          className={cn(
+            'flex items-center gap-2 rounded-xl border border-line dark:border-gray-700/50 text-xs text-muted hover:text-ink dark:hover:text-white hover:bg-ink/5 dark:hover:bg-white/5 transition-all',
+            collapsed ? 'p-2' : 'w-full px-3 py-2'
+          )}
+        >
+          <Search className="w-3.5 h-3.5 shrink-0" />
+          {!collapsed && (
+            <>
+              <span className="flex-1 text-left">Search</span>
+              <kbd className="rounded border border-line dark:border-gray-700/50 px-1 py-0.5 text-[10px] font-medium">⌘K</kbd>
+            </>
+          )}
         </button>
       </div>
 

@@ -14,7 +14,7 @@ export async function listHsCodes(tenantId: string) {
 export async function lookupHsCode(description: string) {
   const session = await requireTenantSession();
   const { tenantId } = session;
-  if (!hasPermission(session.role, 'quotes:write')) {
+  if (!hasPermission(session.role, 'hs_codes:write')) {
     throw new Error('You do not have permission to look up HS codes');
   }
   const trimmed = description.trim();
