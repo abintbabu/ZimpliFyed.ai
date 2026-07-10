@@ -1,16 +1,28 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
+import Resend from "next-auth/providers/resend";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { sendMagicLinkEmail } from "@/lib/magic-link-email";
 import type { MembershipRole, PlatformRole } from "@prisma/client";
 
 const LOGIN_ATTEMPT_LIMIT = 5;
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 
 export type SessionMembership = { tenantId: string; tenantSlug: string; role: MembershipRole };
+
+// Magic-link sign-in only lights up once RESEND_API_KEY is set; otherwise
+// the provider is omitted so local/dev environments keep working unchanged.
+const magicLinkProvider = process.env.RESEND_API_KEY
+  ? Resend({
+      apiKey: process.env.RESEND_API_KEY,
+      from: process.env.RESEND_FROM_EMAIL ?? "Zimplifyed AI <no-reply@zimplifyed.ai>",
+      sendVerificationRequest: sendMagicLinkEmail,
+    })
+  : null;
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -21,6 +33,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       allowDangerousEmailAccountLinking: true,
     }),
+    ...(magicLinkProvider ? [magicLinkProvider] : []),
     Credentials({
       name: "Credentials",
       credentials: {
@@ -52,6 +65,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   pages: {
     signIn: "/login",
     newUser: "/signup",
+    verifyRequest: "/login/check-email",
   },
   callbacks: {
     authorized({ auth }) {

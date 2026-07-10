@@ -68,6 +68,17 @@ model Tenant {
   autoJoinMode   AutoJoinMode  @default(off)
   onboarding     Json?
 
+  // Export-document identity (DOC_ENGINE_SPEC §1.1 DocContext) — the fields
+  // every generated document (PI/CI/PL/COO) needs from the tenant itself.
+  legalName         String?
+  registeredAddress String?
+  iecNumber         String?
+  gstin             String?
+  adCode            String?
+  bankName          String?
+  bankAccountNumber String?
+  bankIfscOrSwift   String?
+
   billingProvider     BillingProvider?
   providerCustomerId  String?          @unique
   providerSubscriptionId String?       @unique
@@ -88,6 +99,7 @@ model Tenant {
   vendorRfqs         VendorRfq[]
   quotes             Quote[]
   invoices           Invoice[]
+  bankRealizations   BankRealization[]
   orders             Order[]
   documents          Document[]
   costSheets         CostSheet[]
@@ -591,13 +603,40 @@ model Invoice {
   dueDate             DateTime?
   isCreditOrDebitNote Boolean   @default(false)
 
-  lines InvoiceLineItem[]
+  lines             InvoiceLineItem[]
+  bankRealizations  BankRealization[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, status])
   @@index([tenantId, orderId])
+}
+
+// e-BRC/FIRC reconciliation: each row is one bank credit advice matched (in
+// full or in part) against an export invoice. PRODUCT_PLAN §22 — realization
+// tracking is what the founder brief and cash-flow forecast are computed from.
+model BankRealization {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  fircNumber   String?
+  ebrcNumber   String?
+  bankName     String?
+  realizedAmount Float
+  realizedCurrency String @default("USD")
+  realizedAt   DateTime
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, invoiceId])
 }
 
 model InvoiceLineItem {

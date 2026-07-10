@@ -1,5 +1,6 @@
 import type { MembershipRole } from '@prisma/client';
 import type { NavIconName } from './nav-icons';
+import { hasPermission, type Permission } from '@/lib/permissions';
 
 export type AppNavChild = {
   label: string;
@@ -10,6 +11,9 @@ export type AppNavItem = {
   label: string;
   href: string;
   icon: NavIconName;
+  /** Preferred: gate visibility by the same permission the target page checks. */
+  permission?: Permission;
+  /** Fallback for items with no single Permission equivalent. */
   roles?: MembershipRole[];
   /** Match this item only on an exact path. */
   exact?: boolean;
@@ -18,6 +22,7 @@ export type AppNavItem = {
 };
 
 export function isNavVisible(item: AppNavItem, role: MembershipRole | null | undefined): boolean {
+  if (item.permission) return hasPermission(role, item.permission);
   if (!item.roles) return true;
   if (!role) return false;
   return item.roles.includes(role);

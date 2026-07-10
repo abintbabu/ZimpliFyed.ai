@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AlertTriangle, PiggyBank, Users2, CheckSquare, ArrowRight } from 'lucide-react';
+import { AlertTriangle, PiggyBank, Users2, CheckSquare, Package, ArrowRight } from 'lucide-react';
 import { auth } from '@/auth';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { TenantSwitcher } from '@/components/onboarding/tenant-switcher';
@@ -12,13 +12,15 @@ import { DemoDataBanner } from '@/components/onboarding/demo-banner';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { Card, CardHeader } from '@/components/dashboard/card';
+import { hasPermission, type Permission } from '@/lib/permissions';
 
-type FunnelAlert = { href: string; message: string };
+type FunnelAlert = { href: string; message: string; requires: Permission };
 
 /**
  * Founder-dashboard funnel-leak alerts, ported from anabyn-website: catches deals stalling
  * between stages rather than actually lost. Computed from data already needed for the counts
- * below — no extra queries beyond the three list fetches.
+ * below — no extra queries beyond the three list fetches. Each alert carries the permission
+ * needed to act on it, so a role that can't open the linked page never sees it.
  */
 async function funnelAlerts(tenantId: string): Promise<FunnelAlert[]> {
   const [acceptedQuotesNoOrder, shippedOrdersNoInvoice, overdueInvoices, complianceItems] = await Promise.all([
@@ -34,16 +36,25 @@ async function funnelAlerts(tenantId: string): Promise<FunnelAlert[]> {
 
   const alerts: FunnelAlert[] = [];
   for (const q of acceptedQuotesNoOrder) {
-    alerts.push({ href: `/dashboard/quotes/${q.id}`, message: `Quote ${q.quoteNumber} was accepted — create the order` });
+    alerts.push({
+      href: `/dashboard/quotes/${q.id}`,
+      message: `Quote ${q.quoteNumber} was accepted — create the order`,
+      requires: 'quotes:read',
+    });
   }
   for (const o of shippedOrdersNoInvoice) {
-    alerts.push({ href: `/dashboard/orders/${o.id}`, message: `Order ${o.orderNumber} has shipped — bill the customer` });
+    alerts.push({
+      href: `/dashboard/orders/${o.id}`,
+      message: `Order ${o.orderNumber} has shipped — bill the customer`,
+      requires: 'invoices:write',
+    });
   }
   if (overdueInvoices.length > 0) {
     const total = overdueInvoices.reduce((sum, i) => sum + i.balanceDue, 0);
     alerts.push({
       href: '/dashboard/invoices',
       message: `${overdueInvoices.length} overdue receivable${overdueInvoices.length > 1 ? 's' : ''} totalling ${total.toFixed(2)}`,
+      requires: 'invoices:read',
     });
   }
   const expiredOrExpiring = complianceItems.filter((c) => {
@@ -55,25 +66,40 @@ async function funnelAlerts(tenantId: string): Promise<FunnelAlert[]> {
     alerts.push({
       href: '/dashboard/compliance',
       message: status === 'expired' ? `${c.name} has expired — renew it` : `${c.name} expires soon — start renewal`,
+      requires: 'compliance:read',
     });
   }
   return alerts;
 }
 
 export default async function DashboardPage() {
-  const { tenantId } = await requireTenantSession();
+  const { tenantId, role } = await requireTenantSession();
   const session = await auth();
   const memberships = session?.user?.memberships ?? [];
   const activeSlug = memberships.find((m) => m.tenantId === tenantId)?.tenantSlug ?? '';
 
-  const [leadCount, openTaskCount, alerts, claimableIncentives, checklist, demoCount] = await Promise.all([
-    prisma.lead.count({ where: { tenantId } }),
-    prisma.task.count({ where: { tenantId, status: { in: ['open', 'in_progress'] } } }),
-    funnelAlerts(tenantId),
-    claimableIncentiveTotal(tenantId),
-    computeChecklist(tenantId),
-    prisma.lead.count({ where: { tenantId, isDemo: true } }),
-  ]);
+  const canReadLeads = hasPermission(role, 'leads:read');
+  const canReadTasks = hasPermission(role, 'tasks:read');
+  const canReadIncentives = hasPermission(role, 'incentives:read');
+  const canReadOrders = hasPermission(role, 'orders:read');
+
+  const [leadCount, openTaskCount, allAlerts, claimableIncentives, orderCount, checklist, demoCount] =
+    await Promise.all([
+      canReadLeads ? prisma.lead.count({ where: { tenantId } }) : Promise.resolve(0),
+      canReadTasks
+        ? prisma.task.count({ where: { tenantId, status: { in: ['open', 'in_progress'] } } })
+        : Promise.resolve(0),
+      funnelAlerts(tenantId),
+      canReadIncentives ? claimableIncentiveTotal(tenantId) : Promise.resolve(0),
+      canReadOrders
+        ? prisma.order.count({ where: { tenantId, status: { in: ['confirmed', 'in_production', 'shipped', 'in_transit'] } } })
+        : Promise.resolve(0),
+      computeChecklist(tenantId),
+      prisma.lead.count({ where: { tenantId, isDemo: true } }),
+    ]);
+
+  const alerts = allAlerts.filter((a) => hasPermission(role, a.requires));
+  const showOrdersCard = canReadOrders && (!canReadLeads || !canReadIncentives);
 
   return (
     <div className="space-y-6">
@@ -88,15 +114,20 @@ export default async function DashboardPage() {
       <OnboardingChecklistCard state={checklist} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Leads" value={leadCount} icon={Users2} href="/dashboard/leads" />
-        <StatCard label="Open tasks" value={openTaskCount} icon={CheckSquare} href="/dashboard/tasks" />
-        <StatCard
-          label="Incentives claimable"
-          value={claimableIncentives.toFixed(2)}
-          icon={PiggyBank}
-          tone="warning"
-          href="/dashboard/incentives"
-        />
+        {canReadLeads && <StatCard label="Leads" value={leadCount} icon={Users2} href="/dashboard/leads" />}
+        {canReadTasks && <StatCard label="Open tasks" value={openTaskCount} icon={CheckSquare} href="/dashboard/tasks" />}
+        {canReadIncentives && (
+          <StatCard
+            label="Incentives claimable"
+            value={claimableIncentives.toFixed(2)}
+            icon={PiggyBank}
+            tone="warning"
+            href="/dashboard/incentives"
+          />
+        )}
+        {showOrdersCard && (
+          <StatCard label="Active orders" value={orderCount} icon={Package} href="/dashboard/orders" />
+        )}
       </div>
 
       {alerts.length > 0 && (

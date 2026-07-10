@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GoogleSignInButton } from "@/components/auth/google-button";
 import { CredentialsSignInForm } from "@/components/auth/credentials-form";
+import { MagicLinkForm } from "@/components/auth/magic-link-form";
 
 export const metadata = {
   title: "Log in",
@@ -34,6 +35,18 @@ export default function LoginPage() {
           </div>
 
           <GoogleSignInButton label="Continue with Google" />
+
+          {Boolean(process.env.RESEND_API_KEY) && (
+            <>
+              <div className="my-6 flex items-center gap-3 text-xs text-muted">
+                <span className="h-px flex-1 bg-line" />
+                or
+                <span className="h-px flex-1 bg-line" />
+              </div>
+
+              <MagicLinkForm />
+            </>
+          )}
 
           <p className="mt-6 text-center text-xs text-muted">
             By signing in, you agree to our{" "}

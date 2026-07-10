@@ -2,9 +2,11 @@ import { notFound } from 'next/navigation';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { getInvoice } from '@/actions/invoices';
+import { listBankRealizations } from '@/actions/bank-realizations';
 import { prisma } from '@/lib/prisma';
 import { DealRail } from '@/components/deal-rail';
 import { InvoiceLineItemsPanel } from '@/components/invoice-line-items-panel';
+import { BankRealizationPanel } from '@/components/bank-realization-panel';
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,6 +19,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   if (!invoice) notFound();
 
   const order = invoice.orderId ? await prisma.order.findFirst({ where: { id: invoice.orderId, tenantId }, include: { quote: true } }) : null;
+  const realizations = invoice.isCreditOrDebitNote ? [] : await listBankRealizations(tenantId, invoice.id);
 
   return (
     <div className="space-y-6">
@@ -37,6 +40,16 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       <div className="rounded-2xl border border-line bg-white px-4 py-3 text-right text-sm font-medium text-ink">
         Balance due: {invoice.currency} {invoice.balanceDue.toFixed(2)}
       </div>
+
+      {!invoice.isCreditOrDebitNote && (
+        <BankRealizationPanel
+          invoiceId={invoice.id}
+          currency={invoice.currency}
+          invoiceTotal={invoice.total}
+          canWrite={hasPermission(role, 'invoices:write')}
+          initial={realizations}
+        />
+      )}
     </div>
   );
 }
