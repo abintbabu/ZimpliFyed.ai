@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
+import { requireFeature } from '@/lib/billing/entitlements';
 import type { ComplianceCategory } from '@prisma/client';
 
 export async function listComplianceItems(tenantId: string) {
@@ -24,6 +25,7 @@ export async function createComplianceItem(input: {
   const session = await requireTenantSession();
   const { tenantId, role } = session;
   if (!hasPermission(role, 'compliance:write')) throw new Error('You do not have permission to manage compliance items');
+  await requireFeature(tenantId, 'compliance_vault');
   if (!input.name.trim()) throw new Error('Name is required');
 
   const item = await prisma.complianceItem.create({

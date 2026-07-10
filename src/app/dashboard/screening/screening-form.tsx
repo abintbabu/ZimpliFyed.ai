@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { runScreeningCheck, recordManualScreeningResult } from '@/actions/screening';
+import { usePlanGate } from '@/lib/billing/use-plan-gate';
+import { UpsellSheet } from '@/components/upsell-sheet';
 import type { ScreeningCheck } from '@prisma/client';
 
 export function ScreeningForm({ apiConfigured }: { apiConfigured: boolean }) {
@@ -12,6 +14,7 @@ export function ScreeningForm({ apiConfigured }: { apiConfigured: boolean }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<ScreeningCheck | null>(null);
+  const { gate, tryOpenFromError, close } = usePlanGate();
 
   function submit() {
     setError(null);
@@ -25,13 +28,14 @@ export function ScreeningForm({ apiConfigured }: { apiConfigured: boolean }) {
         setSubjectName('');
         setNotes('');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Screening failed');
+        if (!tryOpenFromError(err)) setError(err instanceof Error ? err.message : 'Screening failed');
       }
     });
   }
 
   return (
     <div className="rounded-2xl border border-line bg-white p-4">
+      {gate && <UpsellSheet feature={gate} onClose={close} />}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <input
           value={subjectName}

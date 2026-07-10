@@ -6,6 +6,7 @@ import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { screenAgainstConsolidatedList } from '@/lib/screening';
+import { requireFeature } from '@/lib/billing/entitlements';
 
 export async function listScreeningChecks(tenantId: string) {
   return prisma.screeningCheck.findMany({ where: { tenantId }, orderBy: { checkedAt: 'desc' }, take: 50 });
@@ -17,6 +18,7 @@ export async function runScreeningCheck(input: { subjectName: string; country?: 
   if (!hasPermission(role, 'compliance:write')) {
     throw new Error('You do not have permission to run screening checks');
   }
+  await requireFeature(tenantId, 'screening');
   const subjectName = input.subjectName.trim();
   if (!subjectName) throw new Error('Enter a buyer/consignee name to screen');
 

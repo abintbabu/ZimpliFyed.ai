@@ -73,7 +73,8 @@ export async function createOrganization(input: CreateOrgInput): Promise<{ error
       slug: data.slug,
       name: data.companyName,
       status: 'trial',
-      plan: 'free',
+      plan: 'growth', // 14-day trial gets full business entitlements (BILLING_SPEC §3); sweep downgrades to free on expiry.
+      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       businessType: data.businessType as BusinessType,
       exportProducts: data.exportProducts || null,
       primaryMarkets: data.primaryMarkets ?? [],

@@ -40,6 +40,13 @@ enum TenantStatus {
   active
   past_due
   suspended
+  pending_deletion
+  deleted
+}
+
+enum BillingProvider {
+  stripe
+  razorpay
 }
 
 model Tenant {
@@ -61,8 +68,15 @@ model Tenant {
   autoJoinMode   AutoJoinMode  @default(off)
   onboarding     Json?
 
-  stripeCustomerId     String? @unique
-  stripeSubscriptionId String? @unique
+  billingProvider     BillingProvider?
+  providerCustomerId  String?          @unique
+  providerSubscriptionId String?       @unique
+  currentPeriodEnd    DateTime?
+
+  trialEndsAt       DateTime?
+  pastDueSince      DateTime?
+  suspendedAt       DateTime?
+  pendingDeletionAt DateTime?
 
   memberships        Membership[]
   invites            Invite[]
@@ -1040,6 +1054,7 @@ enum MeterEventKind {
   doc_set
   shipment
   agent_task
+  data_export
 }
 
 model MeterEvent {
@@ -1250,4 +1265,16 @@ model KnowledgeChunk {
 
   @@index([packId])
   @@index([packId, supersededAt])
+}
+
+// ─── Billing (BILLING_SPEC) ────────────────────────────────────────────────
+
+/** Webhook replay-safety (BILLING_SPEC §2). Not tenant-scoped — a provider event ID is globally unique. */
+model WebhookEvent {
+  id          String          @id @default(cuid())
+  provider    BillingProvider
+  eventId     String
+  processedAt DateTime        @default(now())
+
+  @@unique([provider, eventId])
 }

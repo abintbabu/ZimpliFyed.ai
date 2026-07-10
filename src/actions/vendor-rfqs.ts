@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
+import { requireFeature } from '@/lib/billing/entitlements';
 
 export async function listVendorRfqs(tenantId: string) {
   return prisma.vendorRfq.findMany({
@@ -38,6 +39,7 @@ export async function createVendorRfq(input: {
   const session = await requireTenantSession();
   const { tenantId, role } = session;
   if (!hasPermission(role, 'vendors:write')) throw new Error('You do not have permission to create RFQs');
+  await requireFeature(tenantId, 'rfq_broadcast');
   if (!input.title.trim()) throw new Error('Title is required');
   if (input.vendorIds.length === 0) throw new Error('Select at least one vendor to invite');
 

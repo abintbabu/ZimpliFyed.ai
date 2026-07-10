@@ -13,7 +13,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "promote": "tsx scripts/promote-super-admin.ts",
     "eval:ai": "tsx src/tests/ai/run.ts",
-    "ingest:corpus": "tsx scripts/ingest-corpus.ts"
+    "ingest:corpus": "tsx scripts/ingest-corpus.ts",
+    "billing:sweep": "tsx scripts/billing-lifecycle-sweep.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
@@ -24,6 +25,7 @@
     "@prisma/client": "^7.8.0",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
+    "jszip": "^3.10.1",
     "lucide-react": "^1.23.0",
     "motion": "^12.42.2",
     "next": "16.2.9",
@@ -32,6 +34,7 @@
     "prisma": "^7.8.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "stripe": "^22.3.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },

@@ -52,9 +52,9 @@ export async function getObject(key: string): Promise<Buffer> {
   return readFile(localPath(key));
 }
 
-export async function getDownloadUrl(key: string): Promise<string> {
+export async function getDownloadUrl(key: string, expiresInSec = 300): Promise<string> {
   if (s3) {
-    return getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 300 });
+    return getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: expiresInSec });
   }
   // Local dev: route through an app API endpoint that reads from disk.
   return `/api/files/${encodeURIComponent(key)}`;

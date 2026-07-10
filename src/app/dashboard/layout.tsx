@@ -25,6 +25,8 @@ export default async function DashboardLayout({
       navItems={visibleItems}
       userEmail={session.user.email}
       roleLabel={ROLE_LABELS[membership.role]}
+      tenantStatus={tenant.status}
+      isOwner={membership.role === 'admin' || membership.role === 'super_admin'}
     >
       {children}
     </DashboardShell>

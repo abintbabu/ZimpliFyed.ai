@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { generateExportDocument, runDocumentConsistencyCheck } from '@/actions/export-documents';
 import { EXPORT_DOCUMENT_LABELS, type ExportDocumentData } from '@/lib/export-documents';
+import { usePlanGate } from '@/lib/billing/use-plan-gate';
+import { UpsellSheet } from '@/components/upsell-sheet';
 import type { ExportDocumentType } from '@prisma/client';
 
 const DOC_TYPES = Object.keys(EXPORT_DOCUMENT_LABELS) as ExportDocumentType[];
@@ -34,6 +36,7 @@ export function ExportDocumentsPanel({
   const [checkResult, setCheckResult] = useState<ConsistencyResult | null>(null);
   const [pending, startTransition] = useTransition();
   const [checking, startChecking] = useTransition();
+  const { gate, tryOpenFromError, close } = usePlanGate();
 
   function handleGenerate(type: ExportDocumentType) {
     setError(null);
@@ -42,7 +45,7 @@ export function ExportDocumentsPanel({
         const doc = await generateExportDocument({ orderId, type, buyerName, buyerAddress });
         setDocs((prev) => [{ ...doc, data: doc.data as unknown as ExportDocumentData }, ...prev]);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to generate document');
+        if (!tryOpenFromError(err)) setError(err instanceof Error ? err.message : 'Failed to generate document');
       }
     });
   }
@@ -62,6 +65,7 @@ export function ExportDocumentsPanel({
 
   return (
     <section className="rounded-2xl border border-line bg-white p-4">
+      {gate && <UpsellSheet feature={gate} onClose={close} />}
       <h2 className="mb-3 text-sm font-semibold text-muted uppercase tracking-wide">Export documents</h2>
 
       {canWrite && (

@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { reviewLetterOfCredit } from '@/actions/letters-of-credit';
 import { AiDraftActions } from '@/components/ai-draft-actions';
+import { usePlanGate } from '@/lib/billing/use-plan-gate';
+import { UpsellSheet } from '@/components/upsell-sheet';
 
 type LcIssue = { clause: string; issue: string; severity: 'low' | 'medium' | 'high' };
 
@@ -33,6 +35,7 @@ export function LcAdvisorPanel({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const { gate, tryOpenFromError, close } = usePlanGate();
 
   function handleReview() {
     setError(null);
@@ -43,13 +46,14 @@ export function LcAdvisorPanel({
         setExpanded(lc.id);
         setRawText('');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'LC review failed');
+        if (!tryOpenFromError(err)) setError(err instanceof Error ? err.message : 'LC review failed');
       }
     });
   }
 
   return (
     <section className="rounded-2xl border border-line bg-white p-4">
+      {gate && <UpsellSheet feature={gate} onClose={close} />}
       <h2 className="mb-3 text-sm font-semibold text-muted uppercase tracking-wide">LC advisor</h2>
       <p className="mb-3 text-xs text-muted">AI review of draft LC terms — advisory only, your bank makes the final determination.</p>
 

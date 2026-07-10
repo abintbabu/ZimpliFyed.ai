@@ -47,6 +47,9 @@ export default async function SettingsPage() {
           <Link href="/dashboard/settings/billing" className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-black/[0.02]">
             Billing &amp; plan
           </Link>
+          <Link href="/dashboard/settings/export" className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-black/[0.02]">
+            Export data
+          </Link>
         </div>
       </div>
     </div>

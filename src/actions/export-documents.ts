@@ -6,6 +6,7 @@ import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { writeDomainEvent } from '@/lib/domain-events';
+import { requireFeature } from '@/lib/billing/entitlements';
 import { buildExportDocumentData, EXPORT_DOCUMENT_LABELS, type ExportDocumentData } from '@/lib/export-documents';
 import { checkDocumentConsistency } from '@/lib/ai/document-consistency';
 import type { ExportDocumentType } from '@prisma/client';
@@ -27,6 +28,7 @@ export async function generateExportDocument(input: {
   const session = await requireTenantSession();
   const { tenantId, role, userId } = session;
   if (!hasPermission(role, 'orders:write')) throw new Error('You do not have permission to generate documents');
+  await requireFeature(tenantId, 'doc_generator');
   if (!input.buyerName.trim()) throw new Error('Buyer name is required');
 
   const order = await prisma.order.findFirst({

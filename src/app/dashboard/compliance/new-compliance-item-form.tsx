@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { createComplianceItem } from '@/actions/compliance';
 import { COMPLIANCE_CATEGORY_LABELS } from '@/lib/compliance-deadlines';
+import { usePlanGate } from '@/lib/billing/use-plan-gate';
+import { UpsellSheet } from '@/components/upsell-sheet';
 import type { ComplianceCategory } from '@prisma/client';
 
 const CATEGORIES = Object.keys(COMPLIANCE_CATEGORY_LABELS) as ComplianceCategory[];
@@ -11,6 +13,7 @@ export function NewComplianceItemForm() {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { gate, tryOpenFromError, close } = usePlanGate();
 
   const submit = (formData: FormData) => {
     setError(null);
@@ -32,20 +35,24 @@ export function NewComplianceItemForm() {
         });
         setOpen(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to add compliance item');
+        if (!tryOpenFromError(err)) setError(err instanceof Error ? err.message : 'Failed to add compliance item');
       }
     });
   };
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white">
-        Add item
-      </button>
+      <>
+        <button onClick={() => setOpen(true)} className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white">
+          Add item
+        </button>
+        {gate && <UpsellSheet feature={gate} onClose={close} />}
+      </>
     );
   }
 
   return (
+    <>
     <form action={submit} className="grid grid-cols-1 gap-3 rounded-2xl border border-line bg-white p-4 sm:grid-cols-2">
       <select name="category" className="rounded-lg border border-line px-3 py-2 text-sm text-ink">
         {CATEGORIES.map((c) => <option key={c} value={c}>{COMPLIANCE_CATEGORY_LABELS[c]}</option>)}
@@ -77,5 +84,7 @@ export function NewComplianceItemForm() {
         {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
     </form>
+    {gate && <UpsellSheet feature={gate} onClose={close} />}
+    </>
   );
 }

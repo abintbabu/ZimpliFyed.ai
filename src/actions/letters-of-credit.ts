@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
+import { requireFeature } from '@/lib/billing/entitlements';
 import { reviewLcTerms } from '@/lib/ai/lc-advisor';
 
 export async function listLettersOfCredit(tenantId: string, orderId: string) {
@@ -41,6 +42,7 @@ export async function reviewLetterOfCredit(input: {
   const session = await requireTenantSession();
   const { tenantId, role, userId } = session;
   if (!hasPermission(role, 'orders:write')) throw new Error('You do not have permission to review LC terms');
+  await requireFeature(tenantId, 'lc_advisor');
   if (!input.rawText.trim()) throw new Error('Paste the draft LC text first');
 
   const order = await prisma.order.findFirst({ where: { id: input.orderId, tenantId } });

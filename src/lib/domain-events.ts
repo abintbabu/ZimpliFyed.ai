@@ -7,7 +7,17 @@ export type DomainEventType =
   | 'quote.sent'
   | 'invoice.paid'
   | 'docset.generated'
-  | 'milestone.reached';
+  | 'milestone.reached'
+  | 'billing.subscribed'
+  | 'billing.cancelled'
+  | 'billing.payment_failed'
+  | 'billing.payment_recovered'
+  | 'billing.trial_expired'
+  | 'billing.suspended'
+  | 'billing.pending_deletion'
+  | 'billing.deleted'
+  | 'billing.dunning_nudge'
+  | 'data_export.requested';
 
 /** Minimal event log for key mutations (AI_PLATFORM_SPEC §6). Consumers — onboarding checklist, health score,
  * future webhooks/agents — poll this table; no queue infra until the TEAMS_AND_ORG_PLAN §9 checkpoint. */

@@ -4,9 +4,18 @@ import { hasPermission } from '@/lib/permissions';
 import { getUsage } from '@/lib/billing/entitlements';
 import { PLANS, isUnlimited } from '@/lib/billing/plans';
 import { prisma } from '@/lib/prisma';
+import { UpgradeButton, ManageBillingButton, BuyOverageButton } from './billing-actions';
+import type { TenantPlan } from '@prisma/client';
 
 export const metadata = { title: 'Billing & plan' };
 export const dynamic = 'force-dynamic';
+
+const UPGRADE_ORDER: Exclude<TenantPlan, 'free'>[] = ['starter', 'growth', 'enterprise'];
+
+function daysUntil(date: Date | null | undefined): number | null {
+  if (!date) return null;
+  return Math.max(0, Math.ceil((date.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+}
 
 export default async function BillingPage() {
   const s = await requireTenantSession();
@@ -16,9 +25,14 @@ export default async function BillingPage() {
 
   const [usage, tenant] = await Promise.all([
     getUsage(s.tenantId),
-    prisma.tenant.findUnique({ where: { id: s.tenantId }, select: { plan: true, status: true } }),
+    prisma.tenant.findUnique({
+      where: { id: s.tenantId },
+      select: { plan: true, status: true, billingProvider: true, trialEndsAt: true, currentPeriodEnd: true },
+    }),
   ]);
   const ent = PLANS[usage.plan];
+  const hasLiveSubscription = tenant?.billingProvider === 'stripe';
+  const trialDaysLeft = daysUntil(tenant?.trialEndsAt);
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -27,16 +41,49 @@ export default async function BillingPage() {
         <p className="mt-1 text-sm text-muted">Manage your subscription and see this month&apos;s usage.</p>
       </div>
 
+      {tenant?.status === 'trial' && trialDaysLeft != null && (
+        <div className="rounded-2xl border border-brand/30 bg-brand/5 p-4 text-sm text-ink">
+          {trialDaysLeft > 0
+            ? `${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left in your trial with full Business features. Add a plan to keep them after it ends.`
+            : 'Your trial ends today — add a plan to keep Business features, or you\'ll drop to Free automatically.'}
+        </div>
+      )}
+
       <div className="rounded-2xl border border-line bg-white p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted">Current plan</p>
             <p className="text-2xl font-semibold text-ink">{ent.label}</p>
-            <p className="mt-1 text-xs capitalize text-muted">Status: {tenant?.status}</p>
+            <p className="mt-1 text-xs capitalize text-muted">
+              Status: {tenant?.status}
+              {tenant?.currentPeriodEnd ? ` · renews ${tenant.currentPeriodEnd.toLocaleDateString()}` : ''}
+            </p>
           </div>
-          <UpgradeCta plan={usage.plan} />
+          {hasLiveSubscription ? <ManageBillingButton /> : usage.plan !== 'enterprise' && <UpgradeButton plan="growth" label="Upgrade" />}
         </div>
       </div>
+
+      {!hasLiveSubscription && (
+        <div className="rounded-2xl border border-line bg-white p-6">
+          <p className="text-sm font-semibold text-ink">Plans</p>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {UPGRADE_ORDER.map((plan) => (
+              <div key={plan} className="rounded-xl border border-line p-4">
+                <p className="text-sm font-semibold text-ink">{PLANS[plan].label}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {isUnlimited(PLANS[plan].seats) ? 'Unlimited seats' : `${PLANS[plan].seats} seats`} · {PLANS[plan].aiActions} AI actions/mo
+                </p>
+                <div className="mt-3">
+                  <UpgradeButton plan={plan} label={plan === usage.plan ? 'Current plan' : `Choose ${PLANS[plan].label}`} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted">
+            Not sure which plan? <a href="mailto:sales@zimplifyed.ai" className="text-brand hover:underline">Talk to us</a>.
+          </p>
+        </div>
+      )}
 
       {usage.aiSpend.capUsd != null && usage.aiSpend.usedUsd >= usage.aiSpend.capUsd && (
         <div className="rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
@@ -53,28 +100,27 @@ export default async function BillingPage() {
         <p className="text-sm font-semibold text-ink">This month&apos;s usage</p>
         <div className="mt-4 space-y-4">
           <Meter label="Team seats" used={usage.seats.used} limit={usage.seats.limit} />
-          <Meter label="AI actions" used={usage.aiActions.used} limit={usage.aiActions.limit} />
-          <Meter label="Document sets" used={usage.docSets.used} limit={usage.docSets.limit} />
+          <div>
+            <Meter label="AI actions" used={usage.aiActions.used} limit={usage.aiActions.limit} />
+            {!isUnlimited(usage.aiActions.limit) && usage.aiActions.used >= usage.aiActions.limit && (
+              <div className="mt-1.5"><BuyOverageButton pack="ai_actions" label="Buy 100 more AI actions" /></div>
+            )}
+          </div>
+          <div>
+            <Meter label="Document sets" used={usage.docSets.used} limit={usage.docSets.limit} />
+            {!isUnlimited(usage.docSets.limit) && usage.docSets.used >= usage.docSets.limit && (
+              <div className="mt-1.5"><BuyOverageButton pack="doc_sets" label="Buy 10 more document sets" /></div>
+            )}
+          </div>
           <UsdMeter label="AI spend" usedUsd={usage.aiSpend.usedUsd} capUsd={usage.aiSpend.capUsd} />
         </div>
       </div>
 
       <p className="text-xs text-muted">
-        Payments launch soon (Razorpay for India, Stripe internationally). Need to upgrade now?{' '}
-        <a href="mailto:sales@zimplifyed.ai" className="text-brand hover:underline">Talk to us</a>.
+        Need a data export or want to close your account? See{' '}
+        <Link href="/dashboard/settings/export" className="text-brand hover:underline">Export data</Link>.
       </p>
     </div>
-  );
-}
-
-function UpgradeCta({ plan }: { plan: string }) {
-  if (plan === 'enterprise' || plan === 'growth') {
-    return <span className="rounded-full bg-success/15 px-3 py-1 text-xs font-medium text-success">All features unlocked</span>;
-  }
-  return (
-    <Link href="mailto:sales@zimplifyed.ai" className="rounded-lg bg-brand-gradient px-4 py-2 text-sm font-semibold text-white">
-      Upgrade
-    </Link>
   );
 }
 
