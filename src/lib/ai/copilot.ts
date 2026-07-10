@@ -29,7 +29,11 @@ export async function askCopilot(tenantId: string, userId: string, role: Members
   const anthropicTools: Anthropic.Tool[] = tools.map((t) => ({
     name: t.name,
     description: t.description,
-    input_schema: { type: 'object', properties: {} },
+    input_schema: {
+      type: 'object',
+      properties: t.inputSchema ?? {},
+      required: t.inputSchema ? Object.keys(t.inputSchema) : [],
+    },
   }));
 
   const system = await fs.readFile(SYSTEM_PROMPT_PATH, 'utf-8');
@@ -64,7 +68,7 @@ export async function askCopilot(tenantId: string, userId: string, role: Members
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
     for (const use of toolUses) {
       const tool = tools.find((t) => t.name === use.name);
-      const result = tool ? await tool.run(tenantId) : 'This tool is not available to your role.';
+      const result = tool ? await tool.run(tenantId, use.input as Record<string, unknown>) : 'This tool is not available to your role.';
       toolResults.push({ type: 'tool_result', tool_use_id: use.id, content: result });
     }
     messages.push({ role: 'user', content: toolResults });

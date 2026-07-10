@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from '@/lib/prisma';
+import { searchKnowledge } from './corpus';
 import type { Permission } from '@/lib/permissions';
 
 /**
@@ -12,7 +13,9 @@ export type RetrievalTool = {
   name: string;
   description: string;
   permission: Permission;
-  run: (tenantId: string) => Promise<string>;
+  /** JSON-schema `properties` for the tool's input, empty for no-arg tools. */
+  inputSchema?: Record<string, { type: string; description: string }>;
+  run: (tenantId: string, input?: Record<string, unknown>) => Promise<string>;
 };
 
 export const RETRIEVAL_TOOLS: RetrievalTool[] = [
@@ -76,6 +79,23 @@ export const RETRIEVAL_TOOLS: RetrievalTool[] = [
       });
       if (invoices.length === 0) return 'No overdue invoices.';
       return invoices.map((i) => `- ${i.invoiceNumber}: balance due ${i.currency} ${i.balanceDue}, due ${i.dueDate?.toISOString().slice(0, 10)}`).join('\n');
+    },
+  },
+  {
+    name: 'search_trade_knowledge',
+    description: 'Searches the trade-knowledge corpus (FTA texts, duty schedules, DGFT circulars, port procedures) for passages relevant to a question. Always cite the returned sourceRef when using this in an answer.',
+    permission: 'compliance:read',
+    inputSchema: { query: { type: 'string', description: 'The question or topic to search the corpus for.' } },
+    run: async (tenantId, input) => {
+      const query = typeof input?.query === 'string' ? input.query : '';
+      if (!query.trim()) return 'No query provided.';
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { packId: true } });
+      if (!process.env.GEMINI_API_KEY) return 'Trade-knowledge search is unavailable (no embedding provider configured).';
+      const hits = await searchKnowledge(tenant?.packId ?? 'in', query);
+      if (hits.length === 0) return 'No relevant passages found in the trade-knowledge corpus.';
+      return hits
+        .map((h) => `[source: ${h.sourceRef}] ${h.title}\n${h.text}`)
+        .join('\n\n---\n\n');
     },
   },
 ];

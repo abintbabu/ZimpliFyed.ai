@@ -11,7 +11,9 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "promote": "tsx scripts/promote-super-admin.ts"
+    "promote": "tsx scripts/promote-super-admin.ts",
+    "eval:ai": "tsx src/tests/ai/run.ts",
+    "ingest:corpus": "tsx scripts/ingest-corpus.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
