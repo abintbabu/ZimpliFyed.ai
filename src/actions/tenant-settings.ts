@@ -19,6 +19,14 @@ export async function getTenantProfile(tenantId: string) {
       teamSizeBand: true,
       plan: true,
       status: true,
+      legalName: true,
+      registeredAddress: true,
+      iecNumber: true,
+      gstin: true,
+      adCode: true,
+      bankName: true,
+      bankAccountNumber: true,
+      bankIfscOrSwift: true,
     },
   });
 }
@@ -28,6 +36,14 @@ export async function updateTenantProfile(input: {
   businessType?: BusinessType | '';
   exportProducts?: string;
   primaryMarkets?: string;
+  legalName?: string;
+  registeredAddress?: string;
+  iecNumber?: string;
+  gstin?: string;
+  adCode?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankIfscOrSwift?: string;
 }) {
   const session = await requireTenantSession();
   const { tenantId, role } = session;
@@ -48,6 +64,14 @@ export async function updateTenantProfile(input: {
       businessType: input.businessType || null,
       exportProducts: input.exportProducts?.trim() || null,
       primaryMarkets,
+      legalName: input.legalName?.trim() || null,
+      registeredAddress: input.registeredAddress?.trim() || null,
+      iecNumber: input.iecNumber?.trim() || null,
+      gstin: input.gstin?.trim() || null,
+      adCode: input.adCode?.trim() || null,
+      bankName: input.bankName?.trim() || null,
+      bankAccountNumber: input.bankAccountNumber?.trim() || null,
+      bankIfscOrSwift: input.bankIfscOrSwift?.trim() || null,
     },
   });
 

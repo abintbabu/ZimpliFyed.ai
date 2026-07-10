@@ -9,6 +9,8 @@ import { listLettersOfCredit } from '@/actions/letters-of-credit';
 import { getOrderPnl } from '@/actions/order-pnl';
 import { DealRail } from '@/components/deal-rail';
 import { DocumentPanel } from '@/components/document-panel';
+import { DocReadinessPanel } from '@/components/doc-readiness-panel';
+import { buildDocContext } from '@/lib/doc-engine/context';
 import { ExportDocumentsPanel } from '@/components/export-documents-panel';
 import { ShipmentTimelinePanel } from '@/components/shipment-timeline-panel';
 import { LcAdvisorPanel } from '@/components/lc-advisor-panel';
@@ -32,6 +34,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const milestones = await listShipmentMilestones(tenantId, order.id);
   const letterOfCredits = await listLettersOfCredit(tenantId, order.id);
   const pnl = await getOrderPnl(order.id);
+  const docContext = await buildDocContext(tenantId, order.id);
 
   return (
     <div className="space-y-6">
@@ -67,6 +70,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         initialLcs={letterOfCredits}
         canWrite={hasPermission(role, 'orders:write')}
       />
+
+      <DocReadinessPanel result={docContext} />
 
       <ExportDocumentsPanel
         orderId={order.id}

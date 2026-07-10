@@ -24,14 +24,7 @@ export default async function SettingsPage() {
         <p className="text-sm font-semibold text-ink">Company profile</p>
         {canManage ? (
           <div className="mt-4">
-            <TenantProfileForm
-              profile={{
-                name: profile.name,
-                businessType: profile.businessType,
-                exportProducts: profile.exportProducts,
-                primaryMarkets: profile.primaryMarkets,
-              }}
-            />
+            <TenantProfileForm profile={profile} />
           </div>
         ) : (
           <p className="mt-2 text-sm text-muted">Only owners and admins can edit company details.</p>

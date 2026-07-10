@@ -20,7 +20,7 @@ _Last updated: 2026-07-10_
 - [x] **Phase 0** foundation: shell, audit, permissions matrix, tenant guard (file storage = local flag, see risk R2)
 - [x] **Phase 1** trader MVP: quotes, vendor RFQs (`vendor-rfqs.ts`), cost sheets (`cost-sheets.ts`), orders, invoices, tracking link — *gap: Copilot v1 exists as page, verify depth*
 - [x] **IMPLEMENTATION_PLAN Wave 1** CRM/catalog backbone: Buyer+Contact+Activity+Product+PriceList models, `/dashboard/buyers` (list/detail/contacts/activity/quotes/orders), `/dashboard/products` (list/detail/price-list items), lead→buyer conversion, quote builder buyer+product picker with price-list prefill and margin-floor soft-block (`MARGIN_FLOOR_PCT`, admin override), quote versioning (`reviseQuote`, revision chain UI) + buyer-facing share/accept link (`/quote/[token]`), buyer backfill script (`scripts/backfill-buyers.ts`) — *gap: AI-assisted dedupe for near-duplicate buyer names (script does exact-match only)*
-- [~] **Phase 2** ship & comply: export-documents ✅, hs-codes ✅, compliance ✅, shipment-milestones ✅, screening ✅, letters-of-credit ✅ — *gap: cross-doc consistency AI (needs DOC_ENGINE_SPEC), doc templates beyond first set*
+- [~] **Phase 2** ship & comply: export-documents ✅, hs-codes ✅, compliance ✅, shipment-milestones ✅, screening ✅, letters-of-credit ✅, DOC_ENGINE_SPEC step 1 ✅ — `DocContext` + fix-list (`src/lib/doc-engine/context.ts`, `DocReadinessPanel` on order detail) validates tenant export-identity (new `Tenant.legalName/iecNumber/gstin/adCode/bank*` fields, editable in Settings), buyer, shipment, and quote line items (incl. HS code) before docs can be generated, surfacing exactly what's missing and where to fix it — *gap: PDF templates, rule engine, AI consistency pass, golden-file eval harness (spec §6 steps 2–7, deliberately deferred — needs design-partner data per GTM_PLAN)*
 - [x] **Phase 3** money: incentive-claims ✅, order-pnl ✅, daily founder brief ✅ (`founder-brief.ts`, `/dashboard/brief`), e-BRC/FIRC reconciliation ✅ (`BankRealization` model, `bank-realizations.ts`, invoice-detail panel — realizations drive `Invoice.balanceDue`/`status` so the founder brief and dashboard alerts stay consistent), cash-flow forecast ✅ (`cash-flow-forecast.ts`, `/dashboard/cash-flow` — 6-week receivables bucketed by invoice due date + incentives pipeline; deliberately omits vendor dues since the finance/expenses module isn't ported yet, flagged inline rather than fabricated)
 - [ ] **Phase 4** manufacturer depth: production stages, QC/AQL, packing, sampling, freight desk
 - [ ] **Phase 5** platform: portal imports, integrations, marketplace
@@ -63,7 +63,7 @@ Legal ToS/Privacy ──→ ANY paid or design-partner signup
 
 ## 3. Now / Next / Later
 
-**NOW (this sprint):** cross-doc consistency AI (Phase 2 gap, needs DOC_ENGINE_SPEC) — the only remaining Phase 2/3 gap.
+**NOW (this sprint):** none open — Phase 2/3 gaps closed for now; DOC_ENGINE_SPEC's remaining steps (templates/PDF, rule engine, AI pass, golden harness) wait on design-partner data per GTM_PLAN.
 **NEXT (1–2 months):** design-partner recruitment · SEO positioning/site rewrite + first 200 pages · LC-checker tool (GTM Q4) · CountryPack: move HS/doc/incentive logic into `in/`.
 **LATER (quarter+):** DOC_ENGINE v1 with CountryPack · admin console · Phase 4 manufacturer-depth modules on customer pull.
 
@@ -82,4 +82,4 @@ Weekly (with the §4 metrics sheet review): flip checkboxes, re-date the header,
 
 ## Done log
 - 2026-07-06: money-pipeline port (MIGRATION §7b detail preserved there)
-- 2026-07-10: quote/invoice line-item edit UI, magic-link email sign-in (Resend), BILLING_SPEC C (Stripe adapter/webhook, lifecycle state machine, data export), AI platform (router, metering, eval harness, corpus ingestion, approval gate), landed-cost vendor RFQ comparison, compliance-expiry sweep, SELF_SERVE Phase B (permission-generated nav + role-filtered dashboard home), e-BRC/FIRC bank realization reconciliation + cash-flow forecast (Phase 3 complete)
+- 2026-07-10: quote/invoice line-item edit UI, magic-link email sign-in (Resend), BILLING_SPEC C (Stripe adapter/webhook, lifecycle state machine, data export), AI platform (router, metering, eval harness, corpus ingestion, approval gate), landed-cost vendor RFQ comparison, compliance-expiry sweep, SELF_SERVE Phase B (permission-generated nav + role-filtered dashboard home), e-BRC/FIRC bank realization reconciliation + cash-flow forecast (Phase 3 complete), DOC_ENGINE_SPEC step 1 (DocContext + fix-list)
