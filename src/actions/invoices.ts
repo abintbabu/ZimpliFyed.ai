@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
+import { writeDomainEvent } from '@/lib/domain-events';
 import { withDefaultExpenseMargin, DEFAULT_EXPENSE_PCT, DEFAULT_MARGIN_PCT } from '@/lib/pricing-buildup';
 import type { InvoiceStatus } from '@prisma/client';
 
@@ -136,6 +137,9 @@ export async function updateInvoiceStatus(invoiceId: string, status: InvoiceStat
     before: { status: before.status, balanceDue: before.balanceDue },
     after: { status, balanceDue: balanceDue ?? before.balanceDue },
   });
+  if (status === 'paid') {
+    await writeDomainEvent(prisma, { tenantId, type: 'invoice.paid', refId: invoiceId, payload: { invoiceNumber: before.invoiceNumber } });
+  }
 
   revalidatePath('/dashboard/invoices');
   revalidatePath(`/dashboard/invoices/${invoiceId}`);

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { reviewLetterOfCredit } from '@/actions/letters-of-credit';
+import { AiDraftActions } from '@/components/ai-draft-actions';
 
 type LcIssue = { clause: string; issue: string; severity: 'low' | 'medium' | 'high' };
 
@@ -13,6 +14,7 @@ type Lc = {
   reviewSummary: string | null;
   issues: unknown;
   createdAt: Date;
+  interactionId?: string | null;
 };
 
 export function LcAdvisorPanel({
@@ -112,6 +114,11 @@ export function LcAdvisorPanel({
                           </li>
                         ))}
                       </ul>
+                    )}
+                    {lc.interactionId && (
+                      <div className="mt-3">
+                        <AiDraftActions interactionId={lc.interactionId} />
+                      </div>
                     )}
                   </div>
                 )}

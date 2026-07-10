@@ -1,9 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector]
 }
 
 // ─── Tenancy ──────────────────────────────────────────────────────────────
@@ -84,6 +86,7 @@ model Tenant {
   incentiveClaims    IncentiveClaim[]
   aiInteractions     AiInteraction[]
   meterEvents        MeterEvent[]
+  domainEvents       DomainEvent[]
   buyers             Buyer[]
   activities         Activity[]
   products           Product[]
@@ -985,17 +988,10 @@ model IncentiveClaim {
 
 // ─── AI platform: metering + feedback (VISION_1B §10 debt-clock) ──────────
 
-enum AiFeature {
-  copilot
-  rfq_extraction
-  buyer_followup
-  quote_negotiation
-}
-
 enum AiFeedbackRating {
-  accept
-  edit
-  reject
+  accepted
+  edited
+  rejected
 }
 
 model AiInteraction {
@@ -1005,17 +1001,25 @@ model AiInteraction {
 
   userId String?
 
-  feature AiFeature
-  model   String
+  flowId       String
+  promptVersion String
+  model        String
+  tier         String
 
-  promptTokens     Int?
-  completionTokens Int?
+  inputSummary Json
+  output       Json
 
-  feedback AiFeedback?
+  latencyMs    Int
+  inputTokens  Int
+  outputTokens Int
+  costUsd      Decimal @db.Decimal(10, 4)
+
+  feedback     AiFeedback?
+  editedOutput Json?
 
   createdAt DateTime @default(now())
 
-  @@index([tenantId, feature])
+  @@index([tenantId, flowId])
   @@index([tenantId, createdAt])
 }
 
@@ -1035,6 +1039,7 @@ enum MeterEventKind {
   ai_action
   doc_set
   shipment
+  agent_task
 }
 
 model MeterEvent {
@@ -1211,4 +1216,38 @@ model PriceListItem {
 
   @@index([priceListId])
   @@index([productId])
+}
+
+// ─── AI platform: event stream + trade-knowledge corpus (AI_PLATFORM_SPEC §4, §6) ─────────────
+
+model DomainEvent {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  type    String
+  refId   String?
+  payload Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, type, createdAt])
+}
+
+model KnowledgeChunk {
+  id       String @id @default(cuid())
+  packId   String
+  sourceRef String
+  title    String
+
+  text      String
+  embedding Unsupported("vector(768)")?
+
+  effectiveFrom  DateTime  @default(now())
+  supersededAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([packId])
+  @@index([packId, supersededAt])
 }

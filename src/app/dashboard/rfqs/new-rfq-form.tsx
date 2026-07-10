@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createVendorRfq } from '@/actions/vendor-rfqs';
 import { extractRfqSpecFromText } from '@/actions/ai';
+import { AiDraftActions } from '@/components/ai-draft-actions';
 
 export function NewRfqForm({ vendors }: { vendors: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
@@ -18,9 +19,11 @@ export function NewRfqForm({ vendors }: { vendors: { id: string; name: string }[
   const [unit, setUnit] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
   const [description, setDescription] = useState('');
+  const [extraction, setExtraction] = useState<{ interactionId: string; original: { title: string; quantity: string; unit: string; targetPrice: string; description: string } } | null>(null);
 
   function handleExtract() {
     setError(null);
+    setExtraction(null);
     startExtracting(async () => {
       try {
         const spec = await extractRfqSpecFromText(pastedText);
@@ -34,6 +37,16 @@ export function NewRfqForm({ vendors }: { vendors: { id: string; name: string }[
           spec.deliveryTerms ? `Delivery: ${spec.deliveryTerms}` : null,
         ].filter(Boolean).join('\n');
         setDescription(notes);
+        setExtraction({
+          interactionId: spec.interactionId,
+          original: {
+            title: spec.product,
+            quantity: spec.quantity != null ? String(spec.quantity) : '',
+            unit: spec.unit ?? '',
+            targetPrice: spec.targetPrice != null ? String(spec.targetPrice) : '',
+            description: notes,
+          },
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'AI extraction failed');
       }
@@ -96,6 +109,16 @@ export function NewRfqForm({ vendors }: { vendors: { id: string; name: string }[
         >
           {extracting ? 'Extracting…' : 'Extract with AI'}
         </button>
+        {extraction && (
+          <div className="mt-2">
+            <AiDraftActions
+              interactionId={extraction.interactionId}
+              original={extraction.original}
+              getCurrentValue={() => ({ title, quantity, unit, targetPrice, description })}
+              onDiscard={() => { setTitle(''); setQuantity(''); setUnit(''); setTargetPrice(''); setDescription(''); }}
+            />
+          </div>
+        )}
       </div>
 
       <input name="rfqNumber" required placeholder="RFQ number (e.g. RFQ-001)" className="rounded-lg border border-line px-3 py-2 text-sm text-ink" />

@@ -6,7 +6,6 @@ import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { draftBuyerFollowup } from '@/lib/ai/buyer-followup';
-import { recordAiInteraction } from '@/lib/ai/metering';
 import type { ActivityKind } from '@prisma/client';
 
 export async function listBuyers(tenantId: string) {
@@ -256,16 +255,7 @@ export async function draftBuyerFollowupAction(buyerId: string) {
       : 'No prior activity logged.',
   ].join('\n');
 
-  const result = await draftBuyerFollowup(context);
+  const { draft, interactionId } = await draftBuyerFollowup(context, tenantId, session.userId);
 
-  await recordAiInteraction({
-    tenantId,
-    userId: session.userId,
-    feature: 'buyer_followup',
-    model: result.model,
-    promptTokens: result.promptTokens,
-    completionTokens: result.completionTokens,
-  });
-
-  return result.draft;
+  return { ...draft, interactionId };
 }

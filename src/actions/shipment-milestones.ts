@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
+import { writeDomainEvent } from '@/lib/domain-events';
 import { MILESTONE_LABELS } from '@/lib/shipment-milestones';
 import type { ShipmentMilestoneType } from '@prisma/client';
 
@@ -51,6 +52,9 @@ export async function upsertShipmentMilestone(input: {
     summary: `Updated ${MILESTONE_LABELS[input.type]} milestone for order ${order.orderNumber}`,
     after: { type: input.type, plannedAt: milestone.plannedAt, actualAt: milestone.actualAt },
   });
+  if (milestone.actualAt) {
+    await writeDomainEvent(prisma, { tenantId, type: 'milestone.reached', refId: input.orderId, payload: { type: input.type, actualAt: milestone.actualAt } });
+  }
 
   revalidatePath(`/dashboard/orders/${input.orderId}`);
   return milestone;

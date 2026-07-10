@@ -38,12 +38,24 @@ export default async function BillingPage() {
         </div>
       </div>
 
+      {usage.aiSpend.capUsd != null && usage.aiSpend.usedUsd >= usage.aiSpend.capUsd && (
+        <div className="rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
+          You&apos;ve hit this month&apos;s AI usage budget (${usage.aiSpend.capUsd.toFixed(0)}). New AI actions are paused until next month or you upgrade your plan.
+        </div>
+      )}
+      {usage.aiSpend.softLimitHit && usage.aiSpend.capUsd != null && usage.aiSpend.usedUsd < usage.aiSpend.capUsd && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+          You&apos;ve used {Math.round((usage.aiSpend.usedUsd / usage.aiSpend.capUsd) * 100)}% of this month&apos;s AI usage budget (${usage.aiSpend.capUsd.toFixed(0)}). Consider upgrading before you hit the cap.
+        </div>
+      )}
+
       <div className="rounded-2xl border border-line bg-white p-6">
         <p className="text-sm font-semibold text-ink">This month&apos;s usage</p>
         <div className="mt-4 space-y-4">
           <Meter label="Team seats" used={usage.seats.used} limit={usage.seats.limit} />
           <Meter label="AI actions" used={usage.aiActions.used} limit={usage.aiActions.limit} />
           <Meter label="Document sets" used={usage.docSets.used} limit={usage.docSets.limit} />
+          <UsdMeter label="AI spend" usedUsd={usage.aiSpend.usedUsd} capUsd={usage.aiSpend.capUsd} />
         </div>
       </div>
 
@@ -63,6 +75,28 @@ function UpgradeCta({ plan }: { plan: string }) {
     <Link href="mailto:sales@zimplifyed.ai" className="rounded-lg bg-brand-gradient px-4 py-2 text-sm font-semibold text-white">
       Upgrade
     </Link>
+  );
+}
+
+function UsdMeter({ label, usedUsd, capUsd }: { label: string; usedUsd: number; capUsd: number | null }) {
+  const unlimited = capUsd == null;
+  const pct = unlimited ? 0 : Math.min(100, (usedUsd / Math.max(1, capUsd)) * 100);
+  const over = !unlimited && usedUsd >= capUsd;
+  const soft = !unlimited && !over && usedUsd >= capUsd * 0.8;
+  return (
+    <div>
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-ink-soft">{label}</span>
+        <span className={over ? 'font-medium text-danger' : soft ? 'font-medium text-amber-700' : 'text-muted'}>
+          ${usedUsd.toFixed(2)} / {unlimited ? '∞' : `$${capUsd.toFixed(0)}`}
+        </span>
+      </div>
+      {!unlimited && (
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-line">
+          <div className={`h-full ${over ? 'bg-danger' : soft ? 'bg-amber-500' : 'bg-brand-gradient'}`} style={{ width: `${pct}%` }} />
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -21,18 +21,18 @@ export async function lookupHsCode(description: string) {
   if (!trimmed) throw new Error('Enter a product description first');
 
   const cached = await prisma.hsCode.findFirst({ where: { tenantId, description: trimmed } });
-  if (cached) return cached;
+  if (cached) return { ...cached, interactionId: null as string | null };
 
-  const result = await classifyHsCode(trimmed);
+  const { classification, interactionId } = await classifyHsCode(trimmed, tenantId, session.userId);
 
   const hsCode = await prisma.hsCode.create({
     data: {
       tenantId,
       description: trimmed,
-      hsCode: result.hsCode,
-      dutyRatePct: result.dutyRatePct,
-      rodtepRatePct: result.rodtepRatePct,
-      rationale: result.rationale,
+      hsCode: classification.hsCode,
+      dutyRatePct: classification.dutyRatePct,
+      rodtepRatePct: classification.rodtepRatePct,
+      rationale: classification.rationale,
     },
   });
 
@@ -41,10 +41,10 @@ export async function lookupHsCode(description: string) {
     collection: 'hs_codes',
     documentId: hsCode.id,
     action: 'create',
-    summary: `AI-classified "${trimmed}" as HS ${result.hsCode}`,
-    after: { hsCode: result.hsCode, dutyRatePct: result.dutyRatePct, rodtepRatePct: result.rodtepRatePct },
+    summary: `AI-classified "${trimmed}" as HS ${classification.hsCode}`,
+    after: { hsCode: classification.hsCode, dutyRatePct: classification.dutyRatePct, rodtepRatePct: classification.rodtepRatePct },
   });
 
   revalidatePath('/dashboard/hs-codes');
-  return hsCode;
+  return { ...hsCode, interactionId };
 }

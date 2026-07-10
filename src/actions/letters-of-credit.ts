@@ -46,7 +46,7 @@ export async function reviewLetterOfCredit(input: {
   const order = await prisma.order.findFirst({ where: { id: input.orderId, tenantId } });
   if (!order) throw new Error('Order not found');
 
-  const review = await reviewLcTerms(input.rawText, buildOrderContext(order));
+  const { review, interactionId } = await reviewLcTerms(input.rawText, buildOrderContext(order), tenantId, userId);
 
   const lc = await prisma.letterOfCredit.create({
     data: {
@@ -73,5 +73,5 @@ export async function reviewLetterOfCredit(input: {
   });
 
   revalidatePath(`/dashboard/orders/${input.orderId}`);
-  return lc;
+  return { ...lc, interactionId };
 }

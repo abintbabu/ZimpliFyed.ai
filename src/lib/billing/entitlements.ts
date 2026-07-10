@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { PLANS, isUnlimited, planHasFeature, type Feature } from './plans';
+import { getAiBudgetStatus } from '@/ai/budget';
 import type { TenantPlan } from '@prisma/client';
 
 /** Thrown when a gated feature is used on a plan that doesn't include it. UI catches → upsell sheet. */
@@ -27,6 +28,7 @@ export type UsageSnapshot = {
   seats: { used: number; limit: number };
   aiActions: { used: number; limit: number };
   docSets: { used: number; limit: number };
+  aiSpend: { usedUsd: number; capUsd: number | null; softLimitHit: boolean };
 };
 
 /** Current-month usage vs plan limits, computed from MeterEvent (AI_PLATFORM §3 rollup). */
@@ -37,10 +39,11 @@ export async function getUsage(tenantId: string): Promise<UsageSnapshot> {
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  const [seatsUsed, aiActions, docSets] = await Promise.all([
+  const [seatsUsed, aiActions, docSets, aiSpend] = await Promise.all([
     prisma.membership.count({ where: { tenantId } }),
     prisma.meterEvent.count({ where: { tenantId, kind: 'ai_action', createdAt: { gte: monthStart } } }),
     prisma.meterEvent.count({ where: { tenantId, kind: 'doc_set', createdAt: { gte: monthStart } } }),
+    getAiBudgetStatus(tenantId),
   ]);
 
   return {
@@ -48,6 +51,7 @@ export async function getUsage(tenantId: string): Promise<UsageSnapshot> {
     seats: { used: seatsUsed, limit: ent.seats },
     aiActions: { used: aiActions, limit: ent.aiActions },
     docSets: { used: docSets, limit: ent.docSets },
+    aiSpend,
   };
 }
 

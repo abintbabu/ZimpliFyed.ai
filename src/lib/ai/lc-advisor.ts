@@ -1,7 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import { anthropic } from './anthropic';
+import { runAi } from '@/ai/router';
 
 const LcReviewSchema = z.object({
   workable: z.boolean().describe('true if the LC terms are broadly workable against the order as-is'),
@@ -17,27 +16,16 @@ const LcReviewSchema = z.object({
 
 export type LcReview = z.infer<typeof LcReviewSchema>;
 
-const SYSTEM_PROMPT = `You are a letter-of-credit advisor for an Indian exporter. Review the draft LC terms against the order details provided and flag clauses that are unworkable, contradictory to the order, or create discrepancy risk at document presentation — e.g. shipment/expiry dates too tight for the production and transit time, quantity/description tolerances that don't match the order, required documents the seller cannot realistically produce, price or Incoterm mismatches, or partial-shipment/transhipment restrictions incompatible with the shipping plan. Do not flag standard, workable LC boilerplate. This is advisory only — the exporter's bank and the buyer's bank make the final determination.`;
-
-export async function reviewLcTerms(lcText: string, orderContext: string): Promise<LcReview> {
-  const response = await anthropic.messages.parse({
-    model: 'claude-opus-4-8',
-    max_tokens: 2048,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: `## Order details\n${orderContext}\n\n## Draft LC text\n${lcText}`,
-      },
-    ],
-    output_config: {
-      format: zodOutputFormat(LcReviewSchema),
-    },
+export async function reviewLcTerms(lcText: string, orderContext: string, tenantId: string, userId: string) {
+  const result = await runAi({
+    flowId: 'lc_advisor',
+    tier: 'reason',
+    tenantId,
+    userId,
+    input: `## Order details\n${orderContext}\n\n## Draft LC text\n${lcText}`,
+    schema: LcReviewSchema,
+    maxTokens: 2048,
   });
 
-  if (!response.parsed_output) {
-    throw new Error('Could not review this LC text');
-  }
-
-  return response.parsed_output;
+  return { review: result.output, interactionId: result.interactionId };
 }

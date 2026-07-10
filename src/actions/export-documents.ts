@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
+import { writeDomainEvent } from '@/lib/domain-events';
 import { buildExportDocumentData, EXPORT_DOCUMENT_LABELS, type ExportDocumentData } from '@/lib/export-documents';
 import { checkDocumentConsistency } from '@/lib/ai/document-consistency';
 import type { ExportDocumentType } from '@prisma/client';
@@ -73,6 +74,7 @@ export async function generateExportDocument(input: {
     summary: `Generated ${EXPORT_DOCUMENT_LABELS[input.type]} v${version} for order ${order.orderNumber}`,
     after: { type: input.type, version },
   });
+  await writeDomainEvent(prisma, { tenantId, type: 'docset.generated', refId: doc.id, payload: { type: input.type, version, orderId: input.orderId } });
 
   revalidatePath(`/dashboard/orders/${input.orderId}`);
   return doc;
@@ -80,7 +82,7 @@ export async function generateExportDocument(input: {
 
 export async function runDocumentConsistencyCheck(orderId: string) {
   const session = await requireTenantSession();
-  const { tenantId } = session;
+  const { tenantId, userId } = session;
   if (!hasPermission(session.role, 'orders:read')) throw new Error('You do not have permission to view this order');
 
   const docs = await listExportDocuments(tenantId, orderId);
@@ -93,8 +95,10 @@ export async function runDocumentConsistencyCheck(orderId: string) {
     throw new Error('Generate at least two document types before running a consistency check');
   }
 
-  const result = await checkDocumentConsistency(
+  const { result, interactionId } = await checkDocumentConsistency(
     latest.map((d) => ({ type: d.type, version: d.version, data: d.data })),
+    tenantId,
+    userId,
   );
 
   await writeAudit({
@@ -108,5 +112,5 @@ export async function runDocumentConsistencyCheck(orderId: string) {
     metadata: { issues: result.issues },
   });
 
-  return result;
+  return { ...result, interactionId };
 }

@@ -6,10 +6,13 @@ import type { HsCode } from '@prisma/client';
 import { DataTable, type DataTableColumn } from '@/components/dashboard/data-table';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { FileSearch } from 'lucide-react';
+import { AiDraftActions } from '@/components/ai-draft-actions';
+
+type HsCodeRow = HsCode & { interactionId: string | null };
 
 export function HsCodeLookup({ initialHistory }: { initialHistory: HsCode[] }) {
   const [description, setDescription] = useState('');
-  const [history, setHistory] = useState(initialHistory);
+  const [history, setHistory] = useState<HsCodeRow[]>(initialHistory.map((h) => ({ ...h, interactionId: null })));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -26,12 +29,17 @@ export function HsCodeLookup({ initialHistory }: { initialHistory: HsCode[] }) {
     });
   }
 
-  const columns: DataTableColumn<HsCode>[] = [
+  const columns: DataTableColumn<HsCodeRow>[] = [
     { key: 'description', header: 'Description', render: (h) => h.description },
     { key: 'hsCode', header: 'HS code', render: (h) => <span className="font-medium text-ink">{h.hsCode}</span> },
     { key: 'dutyRatePct', header: 'Duty %', numeric: true, render: (h) => h.dutyRatePct ?? '—' },
     { key: 'rodtepRatePct', header: 'RoDTEP %', numeric: true, render: (h) => h.rodtepRatePct ?? '—' },
     { key: 'rationale', header: 'Rationale', render: (h) => h.rationale },
+    {
+      key: 'feedback',
+      header: '',
+      render: (h) => (h.interactionId ? <AiDraftActions interactionId={h.interactionId} /> : null),
+    },
   ];
 
   return (

@@ -78,10 +78,10 @@ export function CopilotChat() {
                   <span>Thanks for the feedback.</span>
                 ) : (
                   <>
-                    <button onClick={() => giveFeedback(m.interactionId!, 'accept')} className="hover:text-ink" title="Helpful">
+                    <button onClick={() => giveFeedback(m.interactionId!, 'accepted')} className="hover:text-ink" title="Helpful">
                       👍
                     </button>
-                    <button onClick={() => giveFeedback(m.interactionId!, 'reject')} className="hover:text-ink" title="Not helpful">
+                    <button onClick={() => giveFeedback(m.interactionId!, 'rejected')} className="hover:text-ink" title="Not helpful">
                       👎
                     </button>
                   </>

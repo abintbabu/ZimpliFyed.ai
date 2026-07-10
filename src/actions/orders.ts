@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
+import { writeDomainEvent } from '@/lib/domain-events';
 import type { OrderStatus } from '@prisma/client';
 
 export async function listOrders(tenantId: string) {
@@ -63,6 +64,7 @@ export async function createOrderFromQuote(quoteId: string, input: {
     summary: `Created order ${order.orderNumber} from quote ${quote.quoteNumber}`,
     after: { orderNumber: order.orderNumber, quoteId },
   });
+  await writeDomainEvent(prisma, { tenantId, type: 'order.created', refId: order.id, payload: { orderNumber: order.orderNumber, quoteId } });
 
   revalidatePath('/dashboard/orders');
   revalidatePath('/dashboard/quotes');

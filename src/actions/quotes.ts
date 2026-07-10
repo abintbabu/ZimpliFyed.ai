@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
+import { writeDomainEvent } from '@/lib/domain-events';
 import {
   withDefaultExpenseMargin,
   marginPctFromCostExpensePrice,
@@ -157,6 +158,9 @@ export async function updateQuoteStatus(quoteId: string, status: QuoteStatus) {
     before: { status: before.status },
     after: { status },
   });
+  if (status === 'sent') {
+    await writeDomainEvent(prisma, { tenantId, type: 'quote.sent', refId: quoteId, payload: { quoteNumber: before.quoteNumber } });
+  }
 
   revalidatePath('/dashboard/quotes');
   revalidatePath(`/dashboard/quotes/${quoteId}`);

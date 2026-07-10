@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers';
 import { classifyHsCode, type HsClassification } from '@/lib/ai/hs-classification';
+import { getSystemTenantId } from '@/lib/ai/system-tenant';
 import { checkRateLimitDb } from '@/lib/rate-limit-db';
 
 export type HsFinderResult =
@@ -20,8 +21,9 @@ export async function findHsCode(description: string): Promise<HsFinderResult> {
   if (!rl.allowed) return { ok: false, error: `Free lookups used up. Try again in ${Math.ceil(rl.retryAfterSec / 60)} min or sign up.` };
 
   try {
-    const result = await classifyHsCode(clean);
-    return { ok: true, result };
+    const tenantId = await getSystemTenantId();
+    const { classification } = await classifyHsCode(clean, tenantId);
+    return { ok: true, result: classification };
   } catch {
     return { ok: false, error: 'Could not classify that — try rephrasing.' };
   }
