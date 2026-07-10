@@ -1,5 +1,5 @@
 import { Container, Button, Eyebrow } from "@/components/ui";
-import { ChatMock } from "@/components/home/chat-mock";
+import { HeroMotion } from "@/components/home/hero-motion";
 
 export function Hero() {
   return (
@@ -45,7 +45,7 @@ export function Hero() {
           </p>
         </div>
 
-        <ChatMock />
+        <HeroMotion />
       </Container>
     </section>
   );

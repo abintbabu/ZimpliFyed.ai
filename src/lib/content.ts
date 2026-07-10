@@ -101,6 +101,45 @@ export const heroDemo = {
   },
 } as const;
 
+// "Founder's day, compressed" — the hero motion graphic. A founder's chaotic
+// day of tabs and threads collapses into one ask, and calm outcomes appear.
+export const heroStory = {
+  before: {
+    label: "A founder's Tuesday",
+    clockStart: "9:00 AM",
+    clockEnd: "9:47 PM",
+    chaos: [
+      "14 browser tabs",
+      "Costing spreadsheet v7",
+      "WhatsApp × 14 vendors",
+      "Buyer email thread (32)",
+      "HS code guesswork",
+      "CHA follow-up call",
+      "LC clause doubts",
+      "Shipping bill retyped",
+    ],
+  },
+  ask: "Turn this buyer email into a FOB quote — and check the HS code.",
+  after: {
+    label: "With Zimplifyed",
+    elapsed: "1m 42s",
+    outcomes: [
+      {
+        title: "Quote QT-2041 ready",
+        detail: "FOB $2.14/pc · 22% margin · proforma drafted",
+      },
+      {
+        title: "20+ docs verified",
+        detail: "Consistency-checked · ICEGATE-ready fields",
+      },
+      {
+        title: "Payment & incentives tracked",
+        detail: "LC advised · RoDTEP 3.9% claimed",
+      },
+    ],
+  },
+} as const;
+
 // Proof stats — used instead of fictional customer logos.
 export const proofStats = [
   { value: "20+", label: "shipment documents auto-generated" },
