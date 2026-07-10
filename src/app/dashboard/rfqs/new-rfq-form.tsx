@@ -73,6 +73,7 @@ export function NewRfqForm({ vendors }: { vendors: { id: string; name: string }[
           unit,
           targetPrice: targetPrice ? Number(targetPrice) : undefined,
           vendorIds,
+          aiInteractionId: extraction?.interactionId,
         });
         setOpen(false);
         router.push(`/dashboard/rfqs/${rfq.id}`);

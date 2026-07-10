@@ -14,7 +14,8 @@
     "promote": "tsx scripts/promote-super-admin.ts",
     "eval:ai": "tsx src/tests/ai/run.ts",
     "ingest:corpus": "tsx scripts/ingest-corpus.ts",
-    "billing:sweep": "tsx scripts/billing-lifecycle-sweep.ts"
+    "billing:sweep": "tsx scripts/billing-lifecycle-sweep.ts",
+    "compliance:sweep": "tsx scripts/compliance-expiry-sweep.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
@@ -34,6 +35,7 @@
     "prisma": "^7.8.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "server-only": "^0.0.1",
     "stripe": "^22.3.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"

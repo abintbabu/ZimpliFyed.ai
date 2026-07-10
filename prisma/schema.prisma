@@ -428,6 +428,15 @@ model VendorRfqQuote {
   leadTimeDays Int?
   notes        String?
 
+  // Landed-cost inputs: what the vendor's rate covers, plus trader-side
+  // per-unit add-on costs for stages the vendor's Incoterm does not cover.
+  incoterm             String @default("EXW")
+  inlandFreightPerUnit Float  @default(0)
+  freightPerUnit       Float  @default(0)
+  insurancePerUnit     Float  @default(0)
+  dutiesPerUnit        Float  @default(0)
+  otherCostsPerUnit    Float  @default(0)
+
   awardedFor VendorRfq? @relation("AwardedQuote")
 
   submittedAt DateTime @default(now())
@@ -869,6 +878,10 @@ model ComplianceItem {
   expiresAt        DateTime?
   renewalLeadDays  Int                @default(30)
   notes            String?
+  /** Set by scripts/compliance-expiry-sweep.ts when an expiry alert is emitted. An item re-alerts only when
+   * its alert window moves (i.e. expiresAt is pushed out on renewal), because the sweep compares this
+   * timestamp against the window start (expiresAt - renewalLeadDays). */
+  lastAlertedAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1030,6 +1043,11 @@ model AiInteraction {
 
   feedback     AiFeedback?
   editedOutput Json?
+
+  // Human-approval gate (PRODUCT_PLAN §6): set once when a human explicitly accepts the
+  // draft or applies it to an external-effect action (e.g. sending an RFQ built from it).
+  approvedByUserId String?
+  approvedAt       DateTime?
 
   createdAt DateTime @default(now())
 

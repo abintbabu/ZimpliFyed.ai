@@ -12,6 +12,13 @@ export const COMPLIANCE_CATEGORY_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
+/** Start of the alert window for an item: renewalLeadDays before expiry. Used by the expiry sweep to decide
+ * whether `lastAlertedAt` belongs to the current window (already alerted) or a previous one (alert again —
+ * e.g. after a renewal pushed expiresAt out). */
+export function alertWindowStart(expiresAt: Date, renewalLeadDays: number): Date {
+  return new Date(expiresAt.getTime() - renewalLeadDays * 24 * 60 * 60 * 1000);
+}
+
 /** Renewal-lead-days-aware status: an item due within its own lead window is "expiring_soon", not just "ok until the last day". */
 export function complianceStatus(expiresAt: Date | null, renewalLeadDays: number): ComplianceStatus {
   if (!expiresAt) return 'no_expiry';

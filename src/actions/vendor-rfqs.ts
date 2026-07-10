@@ -6,6 +6,9 @@ import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { requireFeature } from '@/lib/billing/entitlements';
+import { approveAiInteraction } from '@/ai/approval';
+import { z } from 'zod';
+import { INCOTERMS } from '@/lib/landed-cost';
 
 export async function listVendorRfqs(tenantId: string) {
   return prisma.vendorRfq.findMany({
@@ -35,6 +38,8 @@ export async function createVendorRfq(input: {
   targetPrice?: number;
   dueDate?: Date;
   vendorIds: string[];
+  /** Set when the RFQ was drafted via AI extraction — records the human approval on the AiInteraction before the vendor-visible send. */
+  aiInteractionId?: string;
 }) {
   const session = await requireTenantSession();
   const { tenantId, role } = session;
@@ -42,6 +47,13 @@ export async function createVendorRfq(input: {
   await requireFeature(tenantId, 'rfq_broadcast');
   if (!input.title.trim()) throw new Error('Title is required');
   if (input.vendorIds.length === 0) throw new Error('Select at least one vendor to invite');
+
+  // Human-approval gate (PRODUCT_PLAN §6): an AI-extracted draft must be explicitly approved
+  // by the sending user, exactly once, before it has an external (vendor-visible) effect.
+  const aiInteractionId = z.string().min(1).optional().parse(input.aiInteractionId);
+  if (aiInteractionId) {
+    await approveAiInteraction({ interactionId: aiInteractionId, tenantId, userId: session.userId, requireUnused: true });
+  }
 
   const rfq = await prisma.vendorRfq.create({
     data: {
@@ -63,21 +75,30 @@ export async function createVendorRfq(input: {
     documentId: rfq.id,
     action: 'create',
     summary: `Created RFQ ${rfq.rfqNumber} and invited ${input.vendorIds.length} vendor(s)`,
-    after: { rfqNumber: rfq.rfqNumber, title: rfq.title, vendorCount: input.vendorIds.length },
+    after: { rfqNumber: rfq.rfqNumber, title: rfq.title, vendorCount: input.vendorIds.length, aiInteractionId: aiInteractionId ?? null },
   });
 
   revalidatePath('/dashboard/rfqs');
   return rfq;
 }
 
-export async function recordVendorRfqQuote(input: {
-  rfqId: string;
-  vendorId: string;
-  rate: number;
-  moqPieces?: number;
-  leadTimeDays?: number;
-  notes?: string;
-}) {
+const recordQuoteSchema = z.object({
+  rfqId: z.string().min(1),
+  vendorId: z.string().min(1),
+  rate: z.number().positive(),
+  moqPieces: z.number().int().positive().optional(),
+  leadTimeDays: z.number().int().positive().optional(),
+  notes: z.string().optional(),
+  incoterm: z.enum(INCOTERMS),
+  inlandFreightPerUnit: z.number().min(0).default(0),
+  freightPerUnit: z.number().min(0).default(0),
+  insurancePerUnit: z.number().min(0).default(0),
+  dutiesPerUnit: z.number().min(0).default(0),
+  otherCostsPerUnit: z.number().min(0).default(0),
+});
+
+export async function recordVendorRfqQuote(rawInput: z.input<typeof recordQuoteSchema>) {
+  const input = recordQuoteSchema.parse(rawInput);
   const session = await requireTenantSession();
   const { tenantId, role } = session;
   if (!hasPermission(role, 'vendors:write')) throw new Error('You do not have permission to record vendor quotes');
@@ -86,22 +107,23 @@ export async function recordVendorRfqQuote(input: {
   if (!rfq) throw new Error('RFQ not found');
   if (rfq.status !== 'open') throw new Error('This RFQ is no longer open');
 
+  const quoteData = {
+    rate: input.rate,
+    moqPieces: input.moqPieces ?? null,
+    leadTimeDays: input.leadTimeDays ?? null,
+    notes: input.notes?.trim() || null,
+    incoterm: input.incoterm,
+    inlandFreightPerUnit: input.inlandFreightPerUnit,
+    freightPerUnit: input.freightPerUnit,
+    insurancePerUnit: input.insurancePerUnit,
+    dutiesPerUnit: input.dutiesPerUnit,
+    otherCostsPerUnit: input.otherCostsPerUnit,
+  };
+
   const quote = await prisma.vendorRfqQuote.upsert({
     where: { rfqId_vendorId: { rfqId: input.rfqId, vendorId: input.vendorId } },
-    create: {
-      rfqId: input.rfqId,
-      vendorId: input.vendorId,
-      rate: input.rate,
-      moqPieces: input.moqPieces ?? null,
-      leadTimeDays: input.leadTimeDays ?? null,
-      notes: input.notes?.trim() || null,
-    },
-    update: {
-      rate: input.rate,
-      moqPieces: input.moqPieces ?? null,
-      leadTimeDays: input.leadTimeDays ?? null,
-      notes: input.notes?.trim() || null,
-    },
+    create: { rfqId: input.rfqId, vendorId: input.vendorId, ...quoteData },
+    update: quoteData,
   });
 
   await writeAudit({
@@ -109,8 +131,8 @@ export async function recordVendorRfqQuote(input: {
     collection: 'vendor_rfqs',
     documentId: input.rfqId,
     action: 'pricing_change',
-    summary: `Recorded quote from vendor ${input.vendorId} on RFQ ${rfq.rfqNumber}: ${input.rate}`,
-    after: { vendorId: input.vendorId, rate: input.rate },
+    summary: `Recorded quote from vendor ${input.vendorId} on RFQ ${rfq.rfqNumber}: ${input.rate} (${input.incoterm})`,
+    after: { vendorId: input.vendorId, rate: input.rate, incoterm: input.incoterm },
   });
 
   revalidatePath(`/dashboard/rfqs/${input.rfqId}`);

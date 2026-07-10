@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { getVendorRfq } from '@/actions/vendor-rfqs';
+import { computeVendorQuoteLandedCost } from '@/lib/landed-cost';
 import { RecordQuoteForm } from './record-quote-form';
 import { QuoteComparisonTable } from './quote-comparison-table';
 import { RfqStatusActions } from './rfq-status-actions';
@@ -39,6 +40,19 @@ export default async function VendorRfqDetailPage({ params }: { params: Promise<
           id: q.id,
           vendorName: q.vendor.name,
           rate: q.rate,
+          incoterm: q.incoterm,
+          landedCostPerUnit: computeVendorQuoteLandedCost({
+            quoteIncoterm: q.incoterm,
+            comparisonIncoterm: 'DDP',
+            rate: q.rate,
+            addOns: [
+              { category: 'inland_freight', amountPerUnit: q.inlandFreightPerUnit },
+              { category: 'freight', amountPerUnit: q.freightPerUnit },
+              { category: 'insurance', amountPerUnit: q.insurancePerUnit },
+              { category: 'duties', amountPerUnit: q.dutiesPerUnit },
+              { category: 'other', amountPerUnit: q.otherCostsPerUnit },
+            ],
+          }).landedCostPerUnit,
           moqPieces: q.moqPieces,
           leadTimeDays: q.leadTimeDays,
           notes: q.notes,

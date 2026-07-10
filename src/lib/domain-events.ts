@@ -1,4 +1,3 @@
-import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 
@@ -17,7 +16,8 @@ export type DomainEventType =
   | 'billing.pending_deletion'
   | 'billing.deleted'
   | 'billing.dunning_nudge'
-  | 'data_export.requested';
+  | 'data_export.requested'
+  | 'compliance.expiry_alert';
 
 /** Minimal event log for key mutations (AI_PLATFORM_SPEC §6). Consumers — onboarding checklist, health score,
  * future webhooks/agents — poll this table; no queue infra until the TEAMS_AND_ORG_PLAN §9 checkpoint. */

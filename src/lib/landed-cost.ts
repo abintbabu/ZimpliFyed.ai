@@ -64,3 +64,34 @@ export function computeLandedCost(input: LandedCostInput): LandedCostResult {
 
   return { grossCostPerUnit, rodtepCreditPerUnit, landedCostPerUnit, landedMarginPct, excludedLines };
 }
+
+export type VendorQuoteLandedCostInput = {
+  /** Incoterm the vendor's quoted rate covers (what's baked into the rate). */
+  quoteIncoterm: string;
+  /** Common basis all vendor quotes are compared at, e.g. 'DDP'. */
+  comparisonIncoterm: Incoterm;
+  /** Vendor's quoted rate per unit. */
+  rate: number;
+  /** Trader-side per-unit add-on costs beyond the vendor's rate. */
+  addOns: { category: CostCategory; amountPerUnit: number }[];
+};
+
+/**
+ * Landed cost for a vendor RFQ quote, on a common comparison basis.
+ * The vendor rate always counts (as the 'material' line); add-on costs count
+ * only for cost stages the vendor's Incoterm does NOT already cover — those
+ * are assumed to be baked into the rate. RODTEP is intentionally omitted:
+ * it applies uniformly across vendors, so it cancels out in a comparison.
+ */
+export function computeVendorQuoteLandedCost(input: VendorQuoteLandedCostInput): LandedCostResult {
+  const coveredByRate = includedCategoriesFor(input.quoteIncoterm) ?? [];
+  const addOnLines = input.addOns.filter(
+    (l) => l.amountPerUnit > 0 && !coveredByRate.includes(l.category),
+  );
+  return computeLandedCost({
+    incoterm: input.comparisonIncoterm,
+    sellPricePerUnit: 0,
+    rodtepPct: 0,
+    lines: [{ category: 'material', amountPerUnit: input.rate }, ...addOnLines],
+  });
+}

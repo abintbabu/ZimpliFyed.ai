@@ -7,6 +7,8 @@ type QuoteRow = {
   id: string;
   vendorName: string;
   rate: number;
+  incoterm: string;
+  landedCostPerUnit: number;
   moqPieces: number | null;
   leadTimeDays: number | null;
   notes: string | null;
@@ -24,7 +26,7 @@ export function QuoteComparisonTable({
   canWrite: boolean;
 }) {
   const [pending, startTransition] = useTransition();
-  const lowestRate = quotes.length ? Math.min(...quotes.map((q) => q.rate)) : null;
+  const lowestLandedCost = quotes.length ? Math.min(...quotes.map((q) => q.landedCostPerUnit)) : null;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-white">
@@ -32,7 +34,8 @@ export function QuoteComparisonTable({
         <thead className="bg-black/[0.02] text-left text-xs font-semibold uppercase tracking-wide text-muted">
           <tr>
             <th className="px-4 py-3">Vendor</th>
-            <th className="px-4 py-3">Rate</th>
+            <th className="px-4 py-3">Quoted rate</th>
+            <th className="px-4 py-3">Landed cost / unit</th>
             <th className="px-4 py-3">MOQ</th>
             <th className="px-4 py-3">Lead time</th>
             <th className="px-4 py-3">Notes</th>
@@ -46,7 +49,13 @@ export function QuoteComparisonTable({
                 {q.vendorName}
                 {q.id === awardedQuoteId && <span className="ml-2 text-xs font-semibold text-green-700">Awarded</span>}
               </td>
-              <td className={`px-4 py-3 ${q.rate === lowestRate ? 'font-semibold text-green-700' : 'text-ink'}`}>{q.rate}</td>
+              <td className="px-4 py-3 text-ink">
+                {q.rate} <span className="text-xs text-muted">({q.incoterm})</span>
+              </td>
+              <td className={`px-4 py-3 ${q.landedCostPerUnit === lowestLandedCost ? 'font-semibold text-green-700' : 'text-ink'}`}>
+                {q.landedCostPerUnit}
+                {q.landedCostPerUnit === lowestLandedCost && <span className="ml-2 text-xs font-medium text-green-700">Lowest</span>}
+              </td>
               <td className="px-4 py-3 text-muted">{q.moqPieces ?? '—'}</td>
               <td className="px-4 py-3 text-muted">{q.leadTimeDays ? `${q.leadTimeDays}d` : '—'}</td>
               <td className="px-4 py-3 text-muted">{q.notes ?? '—'}</td>
@@ -65,7 +74,7 @@ export function QuoteComparisonTable({
           ))}
           {quotes.length === 0 && (
             <tr>
-              <td colSpan={canWrite ? 6 : 5} className="px-4 py-8 text-center text-muted">No quotes recorded yet.</td>
+              <td colSpan={canWrite ? 7 : 6} className="px-4 py-8 text-center text-muted">No quotes recorded yet.</td>
             </tr>
           )}
         </tbody>
