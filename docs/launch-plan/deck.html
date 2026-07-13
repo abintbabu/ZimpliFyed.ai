@@ -1,0 +1,552 @@
+<title>Zimplifyed.ai — Company Plan</title>
+<style>
+  :root {
+    --paper: #F6F4EE;
+    --paper-2: #EFEBE0;
+    --ink: #0E2A2F;
+    --ink-soft: #38534F;
+    --ink-faint: #6E837E;
+    --line: #D4CDBD;
+    --line-strong: #B9B4A3;
+    --brass: #B77A1F;
+    --brass-deep: #935F13;
+    --teal: #1F6E6A;
+    --good: #2F7A4F;
+    --warn: #B5731A;
+    --crit: #A23A2E;
+    --card: #FFFFFF;
+    --shadow: 0 1px 0 rgba(14,42,47,.04), 0 12px 32px -20px rgba(14,42,47,.35);
+    --serif: "Iowan Old Style", "Charter", "Palatino Linotype", Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0C1E21;
+      --paper-2: #102A2D;
+      --ink: #EAF1EC;
+      --ink-soft: #A9C0BC;
+      --ink-faint: #6F8B87;
+      --line: #1E3A3D;
+      --line-strong: #2B4B4E;
+      --brass: #E0A94A;
+      --brass-deep: #C88E33;
+      --teal: #4FA6A0;
+      --good: #5FB985;
+      --warn: #E0A94A;
+      --crit: #E07866;
+      --card: #12292C;
+      --shadow: 0 1px 0 rgba(0,0,0,.2), 0 18px 40px -24px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0C1E21; --paper-2: #102A2D; --ink: #EAF1EC; --ink-soft: #A9C0BC;
+    --ink-faint: #6F8B87; --line: #1E3A3D; --line-strong: #2B4B4E; --brass: #E0A94A;
+    --brass-deep: #C88E33; --teal: #4FA6A0; --good: #5FB985; --warn: #E0A94A; --crit: #E07866;
+    --card: #12292C; --shadow: 0 1px 0 rgba(0,0,0,.2), 0 18px 40px -24px rgba(0,0,0,.7);
+  }
+  :root[data-theme="light"] {
+    --paper: #F6F4EE; --paper-2: #EFEBE0; --ink: #0E2A2F; --ink-soft: #38534F;
+    --ink-faint: #6E837E; --line: #D4CDBD; --line-strong: #B9B4A3; --brass: #B77A1F;
+    --brass-deep: #935F13; --teal: #1F6E6A; --good: #2F7A4F; --warn: #B5731A; --crit: #A23A2E;
+    --card: #FFFFFF; --shadow: 0 1px 0 rgba(14,42,47,.04), 0 12px 32px -20px rgba(14,42,47,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); line-height: 1.55;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+
+  /* ---- shared type ---- */
+  h1, h2, h3 { font-family: var(--serif); font-weight: 600; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--teal); display: inline-flex; gap: 10px; align-items: baseline;
+  }
+  .eyebrow .num { color: var(--brass); font-weight: 700; }
+  p { margin: 0; }
+  .lede { font-size: 19px; color: var(--ink-soft); max-width: 62ch; }
+  .muted { color: var(--ink-faint); }
+  b, strong { font-weight: 650; color: var(--ink); }
+
+  /* ---- sections ---- */
+  section { padding: 88px 0; border-top: 1px solid var(--line); position: relative; }
+  section:first-of-type { border-top: 0; }
+  .sec-head { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 40px; }
+  .sec-head h2 { font-size: clamp(28px, 3.4vw, 40px); line-height: 1.08; }
+  .sec-head .lede { margin-top: 4px; }
+
+  /* reveal */
+  .reveal { opacity: 0; transform: translateY(14px); transition: opacity .7s ease, transform .7s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
+
+  /* ================= COVER ================= */
+  .cover { padding: 0; border: 0; min-height: 100vh; display: flex; flex-direction: column; }
+  .cover-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 22px 32px; border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint);
+  }
+  .cover-bar .brand { color: var(--ink); letter-spacing: .04em; }
+  .cover-bar .brand b { color: var(--brass); }
+  .cover-main { flex: 1; display: flex; align-items: center; }
+  .cover-grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 56px; align-items: center; width: 100%; }
+  @media (max-width: 860px){ .cover-grid { grid-template-columns: 1fr; gap: 40px; } }
+  .cover h1 { font-size: clamp(38px, 6.4vw, 74px); line-height: 1.02; letter-spacing: -0.02em; }
+  .cover h1 .accent { color: var(--brass); font-style: italic; }
+  .cover .sub { margin-top: 26px; font-size: 20px; color: var(--ink-soft); max-width: 46ch; }
+  .stamp {
+    justify-self: center; width: 210px; height: 210px; border-radius: 50%;
+    border: 2px solid var(--brass); color: var(--brass-deep);
+    display: grid; place-content: center; text-align: center; gap: 4px;
+    font-family: var(--mono); text-transform: uppercase; transform: rotate(-8deg);
+    position: relative; opacity: .92;
+  }
+  .stamp::before { content: ""; position: absolute; inset: 12px; border: 1px solid var(--brass); border-radius: 50%; opacity: .5; }
+  .stamp .big { font-family: var(--serif); font-size: 44px; letter-spacing: 0; line-height: 1; color: var(--brass); }
+  .stamp .lbl { font-size: 10.5px; letter-spacing: .22em; }
+  .stamp .lbl.top { margin-bottom: 6px; }
+  .cover-foot {
+    border-top: 1px solid var(--line); padding: 20px 32px; display: flex; flex-wrap: wrap; gap: 28px;
+    font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint);
+  }
+  .cover-foot b { color: var(--teal); font-weight: 600; }
+
+  /* ================= metric strip ================= */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
+  @media (max-width: 720px){ .metrics { grid-template-columns: repeat(2,1fr); } }
+  .metric { padding: 22px 22px; border-right: 1px solid var(--line); }
+  .metric:last-child { border-right: 0; }
+  @media (max-width: 720px){ .metric:nth-child(2){ border-right:0; } .metric:nth-child(-n+2){ border-bottom:1px solid var(--line);} }
+  .metric .n { font-family: var(--serif); font-size: 34px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .metric .n small { font-size: 17px; color: var(--brass); }
+  .metric .k { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-faint); margin-top: 6px; }
+
+  /* ================= pillars ================= */
+  .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 820px){ .pillars { grid-template-columns: 1fr; } }
+  .pillar { background: var(--card); border: 1px solid var(--line); border-top: 2px solid var(--brass); border-radius: 8px; padding: 22px; box-shadow: var(--shadow); }
+  .pillar h3 { font-size: 19px; margin-bottom: 8px; }
+  .pillar p { font-size: 14.5px; color: var(--ink-soft); }
+
+  /* ================= department ledger ================= */
+  .ledger { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  .ledger thead th {
+    text-align: left; font-family: var(--mono); font-weight: 600; font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-faint); padding: 10px 14px; border-bottom: 1.5px solid var(--line-strong);
+  }
+  .ledger td { padding: 13px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .ledger tr:last-child td { border-bottom: 0; }
+  .ledger .dept { font-family: var(--serif); font-size: 16px; color: var(--ink); white-space: nowrap; }
+  .ledger .job { color: var(--ink-faint); }
+  .table-scroll { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+  .table-scroll table { min-width: 640px; }
+
+  .aut { display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; padding: 2px 7px; border-radius: 4px; }
+  .l0 { background: color-mix(in srgb, var(--crit) 15%, transparent); color: var(--crit); }
+  .l1 { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+  .l2 { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .l3 { background: color-mix(in srgb, var(--teal) 16%, transparent); color: var(--teal); }
+
+  /* ================= roadmap timeline ================= */
+  .phases { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; margin-top: 8px; }
+  @media (max-width: 900px){ .phases { grid-template-columns: 1fr; } }
+  .phase { padding: 20px 18px; border-left: 1px solid var(--line); position: relative; }
+  .phase:first-child { border-left: 0; }
+  @media (max-width: 900px){ .phase { border-left: 0; border-top: 1px solid var(--line); } .phase:first-child{ border-top:0; } }
+  .phase .tick { width: 12px; height: 12px; border-radius: 50%; background: var(--paper); border: 2px solid var(--brass); margin-bottom: 16px; }
+  .phase.done .tick { background: var(--brass); }
+  .phase .win { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--teal); }
+  .phase h3 { font-size: 17px; margin: 8px 0 10px; }
+  .phase .users { font-family: var(--serif); font-size: 26px; font-variant-numeric: tabular-nums; color: var(--brass-deep); }
+  .phase .users small { font-size: 12px; color: var(--ink-faint); font-family: var(--mono); display: block; text-transform: uppercase; letter-spacing: .08em; margin-top: 2px; }
+  .phase p { font-size: 13px; color: var(--ink-soft); margin-top: 12px; }
+  .phase .gate { margin-top: 12px; font-size: 12px; color: var(--ink-faint); border-top: 1px dashed var(--line-strong); padding-top: 10px; }
+  .phase .gate b { color: var(--teal); font-weight: 600; }
+
+  /* ================= two-col ================= */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 820px){ .cols { grid-template-columns: 1fr; } }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 24px; box-shadow: var(--shadow); }
+  .panel h3 { font-size: 20px; margin-bottom: 4px; }
+  .panel .cap { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-faint); margin-bottom: 16px; }
+
+  .price { border-collapse: collapse; width: 100%; font-size: 14px; }
+  .price th, .price td { text-align: right; padding: 10px 10px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .price th:first-child, .price td:first-child { text-align: left; }
+  .price thead th { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-faint); }
+  .price .plan { font-family: var(--serif); font-size: 15px; }
+  .price .rupee { color: var(--brass-deep); font-weight: 600; }
+  .price tr.featured td { background: color-mix(in srgb, var(--brass) 9%, transparent); }
+
+  .stat-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .stat-list li { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .stat-list li:last-child { border-bottom: 0; }
+  .stat-list .lab { color: var(--ink-soft); font-size: 14.5px; }
+  .stat-list .val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+  .stat-list .val.hi { color: var(--brass-deep); }
+
+  /* cost bars */
+  .cost { display: grid; gap: 18px; }
+  .cost-row { display: grid; grid-template-columns: 90px 1fr; gap: 16px; align-items: center; }
+  .cost-row .cl { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .08em; }
+  .bar-track { background: var(--paper-2); border-radius: 6px; height: 40px; position: relative; overflow: hidden; border: 1px solid var(--line); }
+  .bar-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--teal), var(--brass)); display: flex; align-items: center; padding: 0 14px; }
+  .bar-fill span { font-family: var(--mono); font-size: 13px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.35); font-variant-numeric: tabular-nums; }
+  .bar-note { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
+
+  /* growth milestone */
+  .growth { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 820px){ .growth { grid-template-columns: 1fr 1fr; } }
+  .g { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px; box-shadow: var(--shadow); }
+  .g .date { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--teal); }
+  .g .big { font-family: var(--serif); font-size: 30px; font-variant-numeric: tabular-nums; color: var(--brass-deep); margin: 6px 0 2px; }
+  .g .lab { font-size: 12.5px; color: var(--ink-faint); }
+  .g .ch { margin-top: 10px; font-size: 12.5px; color: var(--ink-soft); }
+
+  /* decisions / ask */
+  .asks { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px){ .asks { grid-template-columns: 1fr; } }
+  .ask { display: flex; gap: 14px; padding: 18px; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--brass); border-radius: 8px; }
+  .ask .mk { font-family: var(--serif); font-size: 22px; color: var(--brass); line-height: 1; }
+  .ask p { font-size: 14px; color: var(--ink-soft); }
+  .ask p b { display: block; color: var(--ink); font-family: var(--sans); margin-bottom: 3px; font-size: 14.5px; }
+
+  .callout { background: var(--paper-2); border: 1px solid var(--line-strong); border-radius: 10px; padding: 22px 24px; display: flex; gap: 18px; align-items: flex-start; }
+  .callout .flag { font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #fff; background: var(--crit); padding: 4px 8px; border-radius: 4px; white-space: nowrap; margin-top: 2px; }
+  .callout p { font-size: 15px; color: var(--ink-soft); }
+  .callout p b { color: var(--ink); }
+
+  footer { border-top: 1px solid var(--line); padding: 30px 0 60px; font-family: var(--mono); font-size: 12px; color: var(--ink-faint); }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+
+  .flow { font-family: var(--mono); font-size: 13px; color: var(--ink-soft); background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; line-height: 1.9; overflow-x: auto; }
+  .flow b { color: var(--brass-deep); }
+  .flow .arw { color: var(--teal); padding: 0 4px; }
+</style>
+
+<!-- ============ COVER ============ -->
+<header class="cover">
+  <div class="cover-bar">
+    <span class="brand">Zimplifyed<b>.ai</b></span>
+    <span>Company Plan &nbsp;·&nbsp; Confidential &nbsp;·&nbsp; 12 Jul 2026</span>
+  </div>
+  <div class="cover-main">
+    <div class="wrap cover-grid">
+      <div>
+        <p class="eyebrow"><span class="num">▦</span> The AI-first Export Operating System</p>
+        <h1 style="margin-top:20px;">One system to run <span class="accent">every department</span> of an export firm.</h1>
+        <p class="sub">Inquiry to money-in-the-bank — with AI doing the paperwork, the follow-ups, and the filings prep. A three-person firm runs the work of eight departments, because each department is an AI worker with a human who only approves.</p>
+      </div>
+      <div class="stamp" aria-hidden="true">
+        <span class="lbl top">Target · by 2029</span>
+        <span class="big">1&nbsp;lakh</span>
+        <span class="lbl">registered users</span>
+        <span class="lbl">≈ 42,000 orgs</span>
+      </div>
+    </div>
+  </div>
+  <div class="cover-foot">
+    <span>North star · <b>AI-completed department-hours / org / week</b></span>
+    <span>Market · <b>~1.5 lakh active Indian exporters</b></span>
+    <span>Raise · <b>$1.5M seed</b></span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ THESIS ============ -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow"><span class="num">01</span> The thesis</p>
+        <h2>We don't ship features. We ship departments.</h2>
+        <p class="lede">An Indian exporter with three people does the work of eight departments. Zimplifyed replaces the missing five with AI departments — each one a workflow where AI does the expert labor and the human's only job is to approve, correct, or escalate.</p>
+      </div>
+      <div class="pillars">
+        <div class="pillar reveal"><h3>The workflow is the wedge</h3><p>Fintech, marketplace and per-outcome pricing only work because the department workflows capture the data. We never ship monetization ahead of the workflow that feeds it — the data is the moat.</p></div>
+        <div class="pillar reveal"><h3>Trust before autonomy</h3><p>Every AI action is metered, cited, approval-gated and feedback-captured. Autonomy rises only as measured accuracy earns it. AI never files, sends, or pays externally without an explicit human tap.</p></div>
+        <div class="pillar reveal"><h3>WhatsApp is a first-class UI</h3><p>For our core user the web app is the back office; WhatsApp is where the business actually runs. The unified inbox starts there — but email and web are peers, so no single channel is the spine.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRODUCT / DEPARTMENT MAP ============ -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow"><span class="num">02</span> The product</p>
+        <h2>Eight departments, one approval tap each.</h2>
+        <p class="lede">Every capability maps to a department a small exporter would otherwise staff. If it doesn't replace hours of a named role's work, it's cut. HR and a general ledger are deliberately out — we sync to Tally, we don't rebuild it.</p>
+      </div>
+      <div class="table-scroll reveal">
+        <table class="ledger">
+          <thead>
+            <tr><th>Department</th><th>The human it replaces</th><th>What the AI does</th><th>Autonomy</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="dept">Sales &amp; CRM</td><td class="job">Founder-as-CRM</td><td>Unified inbox reads the requirement, drafts the quote, plans and sends the follow-ups</td><td><span class="aut l2">L2</span> <span class="aut l1">L1</span></td></tr>
+            <tr><td class="dept">Quoting &amp; costing</td><td class="job">Trader / pricing desk</td><td>Landed-cost sheet with live margin vs floor, quote PDF, negotiation replies</td><td><span class="aut l2">L2</span> <span class="aut l1">L1</span></td></tr>
+            <tr><td class="dept">Sourcing</td><td class="job">Purchase manager</td><td>Vendor shortlist, tokenized RFQ broadcast, landed-cost comparison &amp; award rationale</td><td><span class="aut l2">L2</span> <span class="aut l1">L1</span></td></tr>
+            <tr><td class="dept">Docs &amp; compliance</td><td class="job">CHA data-entry + ops</td><td>One-click cross-validated shipment doc-set, expiry sweeps, LC clause review</td><td><span class="aut l2">L2</span> <span class="aut l0">L0 filings</span></td></tr>
+            <tr><td class="dept">Logistics</td><td class="job">Shipping clerk</td><td>Freight RFQ desk, milestone tracking, demurrage countdowns, B/L checklist</td><td><span class="aut l2">L2</span> <span class="aut l1">L1</span></td></tr>
+            <tr><td class="dept">Accounting &amp; GST</td><td class="job">Part-time accountant</td><td>Scan expense → classify GST head → book → GSTR-ready pack routed to the CA</td><td><span class="aut l2">L2</span> <span class="aut l0">L0 filing</span></td></tr>
+            <tr><td class="dept">Finance &amp; incentives</td><td class="job">Consultant on commission</td><td>Order P&amp;L, e-BRC/FIRC reconciliation, RoDTEP/drawback owed, cash-flow forecast</td><td><span class="aut l2">L2</span> <span class="aut l1">L1</span></td></tr>
+            <tr><td class="dept">Production / QC</td><td class="job">Production supervisor</td><td>Stage plans, slippage detection, photo-evidenced QC and AQL (manufacturers)</td><td><span class="aut l2">L2</span> <span class="aut l1">L1</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:22px;" class="reveal">
+        <p class="eyebrow" style="margin-bottom:10px;"><span class="num">◇</span> The founder's example, as a pipeline</p>
+        <div class="flow">
+          snap the expense <span class="arw">→</span> <b>AI OCR + classify</b> (GST head · ITC-eligible? · order attribution) <span class="arw">→</span> confidence gate <span class="arw">→</span> auto-post &amp; Order&nbsp;P&amp;L <span class="arw">|</span> low-confidence to review queue <span class="arw">→</span> month-end <b>GSTR pack</b> <span class="arw">→</span> the firm's CA files. &nbsp;<span style="color:var(--crit)">Never a general ledger; never auto-filed.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ AUTONOMY LADDER ============ -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow"><span class="num">03</span> The autonomy contract</p>
+        <h2>"Minimal human intervention" is a measured promotion, not a promise.</h2>
+        <p class="lede">A workflow moves up a level only when its acceptance-without-edit rate clears 60% over 100+ instances and the money- or compliance-guardrail owner signs off. Three rejections in a week auto-demotes it.</p>
+      </div>
+      <div class="table-scroll reveal">
+        <table class="ledger">
+          <thead><tr><th>Level</th><th>Meaning</th><th>Where it applies</th></tr></thead>
+          <tbody>
+            <tr><td><span class="aut l0">L0</span></td><td class="dept" style="font-size:15px">Never autonomous</td><td class="job">AI preps, a human executes outside the product — government filings (GST, ICEGATE, DGFT), payments, LC acceptance. Permanent.</td></tr>
+            <tr><td><span class="aut l1">L1</span></td><td class="dept" style="font-size:15px">Draft &amp; approve</td><td class="job">AI drafts; explicit human approval before any external effect — all outbound comms, quote/doc release, RFQ broadcast, vendor award.</td></tr>
+            <tr><td><span class="aut l2">L2</span></td><td class="dept" style="font-size:15px">Auto with review queue</td><td class="job">AI acts inside the tenant's own data; human reviews by exception — extraction, high-confidence expense posting, lead logging, cost-sheet drafts.</td></tr>
+            <tr><td><span class="aut l3">L3</span></td><td class="dept" style="font-size:15px">Autonomous agents</td><td class="job">Multi-step with a policy budget, post-hoc audit — follow-up cadences, expiry-renewal chains. Gated on the event stream + earned acceptance.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted reveal" style="margin-top:18px; font-size:13.5px; font-family:var(--mono);">The v2 keystone — the <b style="color:var(--brass-deep)">Action Queue</b> — is how this becomes a UI: one queue of every AI-proposed action across departments. The founder's day becomes the queue plus the daily brief.</p>
+    </div>
+  </section>
+
+  <!-- ============ ROADMAP ============ -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow"><span class="num">04</span> The roadmap to 1 lakh users</p>
+        <h2>Five phases, sequenced in data-flow order.</h2>
+        <p class="lede">No department starts before the prior phase clears its metric gate. Departments ship in the order their data feeds the next one — docs, then sales, then finance, then the full stack, then money.</p>
+      </div>
+      <div class="phases reveal">
+        <div class="phase done">
+          <div class="tick"></div>
+          <div class="win">Phase 1 · 2026 Q4</div>
+          <h3>Docs department + paid launch</h3>
+          <div class="users">1,000<small>50 paying orgs</small></div>
+          <p>DOC_ENGINE steps 2–7 with design partners, golden evals, LC checker, first 200 SEO pages.</p>
+          <div class="gate"><b>Gate:</b> doc-set accuracy ≥95% + 50 paying</div>
+        </div>
+        <div class="phase">
+          <div class="tick"></div>
+          <div class="win">Phase 2 · 2027 H1</div>
+          <h3>Sales department: unified inbox</h3>
+          <div class="users">8,000<small>$1M run-rate</small></div>
+          <p>WhatsApp + email + web into one inbox → requirement → AI quote → follow-up cadence.</p>
+          <div class="gate"><b>Gate:</b> week-4 retention ≥45%, inbox attach ≥60%</div>
+        </div>
+        <div class="phase">
+          <div class="tick"></div>
+          <div class="win">Phase 3 · 2028 H1</div>
+          <h3>Finance department + agents</h3>
+          <div class="users">25,000<small>1,500 paying orgs</small></div>
+          <p>Expense-scan → GST pack → CA. First L3 agents. CA-partner channel opens.</p>
+          <div class="gate"><b>Gate:</b> 50 CA partners, agent attach ≥20%</div>
+        </div>
+        <div class="phase">
+          <div class="tick"></div>
+          <div class="win">Phase 4 · 2028</div>
+          <h3>Full-stack firm</h3>
+          <div class="users">60,000<small>$10M ARR</small></div>
+          <p>Production/QC, freight desk, mobile, vendor portal at scale — every vendor becomes a user.</p>
+          <div class="gate"><b>Gate:</b> vendor users ≥1.5× tenant users</div>
+        </div>
+        <div class="phase">
+          <div class="tick"></div>
+          <div class="win">Phase 5 · 2029</div>
+          <h3>Money + borders</h3>
+          <div class="users">100,000<small>10,000 paying orgs</small></div>
+          <p>Fintech attach (FX, insurance, financing), first country pack, buyer-side workspace.</p>
+          <div class="gate"><b>Gate:</b> fintech ≥15% of revenue</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TECH + COST ============ -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow"><span class="num">05</span> The build</p>
+        <h2>An event-driven agent platform — not a CRM with AI bolted on.</h2>
+        <p class="lede">Modules become tools that agents call, gated by the human-approval layer that already exists. A monolith plus a worker fleet plus a queue holds all the way to 100k users — no microservices, no sharding, no rewrite.</p>
+      </div>
+      <div class="cols">
+        <div class="panel reveal">
+          <h3>Reuse over rebuild</h3>
+          <p class="cap">Already shipped · the substrate</p>
+          <ul class="stat-list">
+            <li><span class="lab">Model router, tiers &amp; metering</span><span class="val">live</span></li>
+            <li><span class="lab">Human-approval gate</span><span class="val">live</span></li>
+            <li><span class="lab">Tenant-scoped Prisma + pgvector</span><span class="val">live</span></li>
+            <li><span class="lab">Document / vision pipeline</span><span class="val hi">build</span></li>
+            <li><span class="lab">Unified inbox (channel adapters)</span><span class="val hi">build</span></li>
+            <li><span class="lab">Durable AgentRun orchestrator</span><span class="val hi">build</span></li>
+          </ul>
+          <p class="muted" style="font-size:13px; margin-top:16px;">Integrations: GST via a GSP partner · banking via Account Aggregator · WhatsApp Cloud API with BSP fallback. Filings stay human-approved forever.</p>
+        </div>
+        <div class="panel reveal">
+          <h3>Running cost at scale</h3>
+          <p class="cap">Monthly · infra + AI inference · ±35%</p>
+          <div class="cost">
+            <div class="cost-row">
+              <div class="cl">1k users</div>
+              <div><div class="bar-track"><div class="bar-fill" style="width:9%"><span>$2k</span></div></div><div class="bar-note">₹1.7L/mo · ~$10 / tenant</div></div>
+            </div>
+            <div class="cost-row">
+              <div class="cl">10k users</div>
+              <div><div class="bar-track"><div class="bar-fill" style="width:26%"><span>$18k</span></div></div><div class="bar-note">₹15.5L/mo · ~$9 / tenant</div></div>
+            </div>
+            <div class="cost-row">
+              <div class="cl">100k users</div>
+              <div><div class="bar-track"><div class="bar-fill" style="width:100%"><span>$129k</span></div></div><div class="bar-note">₹1.11Cr/mo · ~$7 / tenant</div></div>
+            </div>
+          </div>
+          <p class="muted" style="font-size:13px; margin-top:18px;">Cost per tenant <b>falls</b> with scale — prompt caching, batch tiers and tier-appropriate models. AI COGS holds at ~15% of plan revenue, well under the 20% guardrail.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRICING + ECONOMICS ============ -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow"><span class="num">06</span> The money</p>
+        <h2>Priced on AI outcomes, anchored to what a CHA charges.</h2>
+        <p class="lede">The value metric is AI outcomes — actions and doc-sets — not seats. The pitch line writes itself: your CHA charges ₹4,000 a shipment; we charge ₹99 a doc-set. Free where it grows users, paid where AI does the work.</p>
+      </div>
+      <div class="cols">
+        <div class="panel reveal">
+          <h3>Plans</h3>
+          <p class="cap">INR / month · AI-outcome metered</p>
+          <table class="price">
+            <thead><tr><th>Plan</th><th>₹ / mo</th><th>Actions</th><th>Doc-sets</th></tr></thead>
+            <tbody>
+              <tr><td class="plan">Free</td><td class="rupee">0</td><td>20</td><td>0</td></tr>
+              <tr class="featured"><td class="plan">Starter</td><td class="rupee">1,499</td><td>200</td><td>10</td></tr>
+              <tr><td class="plan">Growth</td><td class="rupee">4,999</td><td>1,000</td><td>50</td></tr>
+              <tr><td class="plan">Enterprise</td><td class="rupee">15,000+</td><td>custom</td><td>custom</td></tr>
+            </tbody>
+          </table>
+          <p class="muted" style="font-size:12.5px; margin-top:14px;">Overage: ₹199 / 100 actions · ₹99 / doc-set. No card required for the India trial.</p>
+        </div>
+        <div class="panel reveal">
+          <h3>Unit economics</h3>
+          <p class="cap">Blended · paid tiers</p>
+          <ul class="stat-list">
+            <li><span class="lab">Gross margin (paid)</span><span class="val hi">77–78%</span></li>
+            <li><span class="lab">LTV</span><span class="val">$905</span></li>
+            <li><span class="lab">Blended CAC / org</span><span class="val">$220</span></li>
+            <li><span class="lab">LTV : CAC</span><span class="val hi">4.1×</span></li>
+            <li><span class="lab">Payback</span><span class="val">&lt; 8 mo</span></li>
+            <li><span class="lab">Break-even</span><span class="val">~2,400 payers · 2028 H2</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="metrics reveal" style="margin-top:22px;">
+        <div class="metric"><div class="n">$1.5<small>M</small></div><div class="k">Seed raise</div></div>
+        <div class="metric"><div class="n">$1.05<small>M</small></div><div class="k">Net burn to break-even</div></div>
+        <div class="metric"><div class="n">18<small>mo</small></div><div class="k">Runway + 40% buffer</div></div>
+        <div class="metric"><div class="n">~30</div><div class="k">Headcount at $25M ARR</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GROWTH ============ -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow"><span class="num">07</span> Go to market</p>
+        <h2>The AI-first Export OS — one story, not four products.</h2>
+        <p class="lede">Zoho doesn't know what a shipping bill is. Tally records what happened; we run what happens next. We don't ask exporters to leave WhatsApp or Excel — we live in one and import the other in twenty minutes. Channels compound: SEO and free tools, then partners, no single channel over half.</p>
+      </div>
+      <div class="growth reveal">
+        <div class="g">
+          <div class="date">2026 Q4</div>
+          <div class="big">1k</div>
+          <div class="lab">~420 orgs</div>
+          <div class="ch">Waitlist · design partners · community</div>
+        </div>
+        <div class="g">
+          <div class="date">end 2027</div>
+          <div class="big">10k</div>
+          <div class="lab">~4,200 orgs</div>
+          <div class="ch">2,000 SEO pages · referrals · Hindi YouTube</div>
+        </div>
+        <div class="g">
+          <div class="date">end 2028</div>
+          <div class="big">35k</div>
+          <div class="lab">~14,500 orgs</div>
+          <div class="ch">CA/CHA partners GA · vernacular · L3 agents</div>
+        </div>
+        <div class="g">
+          <div class="date">2029 H2</div>
+          <div class="big">100k</div>
+          <div class="lab">~42,000 orgs</div>
+          <div class="ch">Compounding SEO+GEO · 150 partners · flywheels</div>
+        </div>
+      </div>
+      <p class="muted reveal" style="margin-top:20px; font-family:var(--mono); font-size:12.5px;">Blended CAC / user glides ₹120 → ₹90 → ₹70 as organic passes 60% of signups. 1 lakh users ≈ 10–12% of the reachable Indian pool — aggressive, not TAM-constrained.</p>
+    </div>
+  </section>
+
+  <!-- ============ THE ASK ============ -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow"><span class="num">08</span> Decisions for the founder</p>
+        <h2>What needs a yes before we execute.</h2>
+      </div>
+      <div class="callout reveal" style="margin-bottom:22px;">
+        <span class="flag">#1 Blocker</span>
+        <p><b>Billing is Stripe-only today.</b> The Razorpay adapter (UPI, netbanking, GST invoices) is unbuilt — and INR pricing is dead without it. This must land in the foundation phase, before the 2026 Q4 paid launch. It is the single highest-leverage revenue task in the plan.</p>
+      </div>
+      <div class="asks reveal">
+        <div class="ask"><span class="mk">✎</span><p><b>Confirm price points &amp; the no-card India trial</b>Before the pricing page and paid launch go live.</p></div>
+        <div class="ask"><span class="mk">◉</span><p><b>Approve going public</b>Pricing pages, the waitlist on zimplifyed.ai, and any paid spend are irreversible — they need a founder yes.</p></div>
+        <div class="ask"><span class="mk">§</span><p><b>Sign the legal launch blockers</b>Design-partner agreement plus the "decision support, not a CA/CHA" disclaimers on the GST pack and doc engine.</p></div>
+        <div class="ask"><span class="mk">₹</span><p><b>Approve the $1.5M seed plan</b>Series A only after Phase-3 per-outcome revenue proves out — best multiple, least dilution.</p></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Zimplifyed.ai · Master Launch Plan · synthesized from CEO / CTO / CPO / CFO / CMO plans</span>
+    <span>North star · AI-completed department-hours / org / week</span>
+  </div>
+</footer>
+
+<script>
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+</script>
