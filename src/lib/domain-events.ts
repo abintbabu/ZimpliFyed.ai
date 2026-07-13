@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 export type DomainEventType =
   | 'order.created'
   | 'quote.sent'
+  | 'enquiry.quoted'
   | 'invoice.paid'
   | 'docset.generated'
   | 'milestone.reached'
