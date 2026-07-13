@@ -5,6 +5,7 @@ import { generateExportDocument, runDocumentConsistencyCheck } from '@/actions/e
 import { EXPORT_DOCUMENT_LABELS, type ExportDocumentData } from '@/lib/export-documents';
 import { usePlanGate } from '@/lib/billing/use-plan-gate';
 import { UpsellSheet } from '@/components/upsell-sheet';
+import { AdvisoryDisclaimer } from '@/components/advisory-disclaimer';
 import type { ExportDocumentType } from '@prisma/client';
 
 const DOC_TYPES = Object.keys(EXPORT_DOCUMENT_LABELS) as ExportDocumentType[];
@@ -176,6 +177,10 @@ export function ExportDocumentsPanel({
           )}
         </div>
       )}
+
+      <div className="mt-4">
+        <AdvisoryDisclaimer kind="docs" />
+      </div>
     </section>
   );
 }

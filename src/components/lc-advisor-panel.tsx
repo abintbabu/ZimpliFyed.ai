@@ -5,6 +5,7 @@ import { reviewLetterOfCredit } from '@/actions/letters-of-credit';
 import { AiDraftActions } from '@/components/ai-draft-actions';
 import { usePlanGate } from '@/lib/billing/use-plan-gate';
 import { UpsellSheet } from '@/components/upsell-sheet';
+import { AdvisoryDisclaimer } from '@/components/advisory-disclaimer';
 
 type LcIssue = { clause: string; issue: string; severity: 'low' | 'medium' | 'high' };
 
@@ -131,6 +132,10 @@ export function LcAdvisorPanel({
           })}
         </ul>
       )}
+
+      <div className="mt-4">
+        <AdvisoryDisclaimer kind="lc" />
+      </div>
     </section>
   );
 }
