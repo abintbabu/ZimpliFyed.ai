@@ -4,6 +4,7 @@ import { listLeads } from '@/actions/leads';
 import { LEAD_STAGES, LEAD_STAGE_LABELS } from './lead-stages';
 import { LeadCard } from './lead-card';
 import { NewLeadForm } from './new-lead-form';
+import { PasteEnquiryBox } from './paste-enquiry-box';
 
 export default async function LeadsPage() {
   const { tenantId, role } = await requireTenantSession();
@@ -12,6 +13,7 @@ export default async function LeadsPage() {
   }
 
   const canWrite = hasPermission(role, 'leads:write');
+  const canQuote = hasPermission(role, 'quotes:write');
   const leads = await listLeads(tenantId);
 
   return (
@@ -20,6 +22,8 @@ export default async function LeadsPage() {
         <h1 className="text-2xl font-semibold text-ink">Leads</h1>
         {canWrite && <NewLeadForm />}
       </div>
+
+      {canQuote && <PasteEnquiryBox />}
 
       <div className="flex gap-4 overflow-x-auto pb-4">
         {LEAD_STAGES.map((stage) => {

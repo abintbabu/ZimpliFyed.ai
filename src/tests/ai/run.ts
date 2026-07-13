@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { evalRfqExtraction } from './flows/rfq-extraction.eval';
 import { evalBuyerFollowup } from './flows/buyer-followup.eval';
+import { evalEnquiryExtraction } from './flows/enquiry-extraction.eval';
 import { evalDocConsistency } from './flows/doc-consistency.eval';
 
 /**
@@ -25,7 +26,7 @@ async function main() {
   const updateBaselines = process.argv.includes('--update-baselines');
   const baselines = await loadBaselines();
 
-  const evals = [await evalRfqExtraction(), await evalBuyerFollowup(), await evalDocConsistency()];
+  const evals = [await evalRfqExtraction(), await evalBuyerFollowup(), await evalEnquiryExtraction(), await evalDocConsistency()];
 
   let regressed = false;
   console.log('\nAI eval scorecard\n' + '='.repeat(60));
