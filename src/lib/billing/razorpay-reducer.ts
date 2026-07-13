@@ -50,6 +50,10 @@ export async function reduceRazorpayEvent(event: RazorpayWebhook): Promise<void>
   switch (event.event) {
     case 'subscription.activated':
     case 'subscription.charged': {
+      // A charge on a tenant that was past_due is a recovery; a charge on an already-active tenant is just
+      // a routine renewal. Mirrors stripe-reducer's invoice.paid, which only emits recovery from past_due —
+      // without this check every monthly renewal would fire a false billing.payment_recovered.
+      const before = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { status: true } });
       await prisma.tenant.update({
         where: { id: tenantId },
         data: {
@@ -61,12 +65,13 @@ export async function reduceRazorpayEvent(event: RazorpayWebhook): Promise<void>
           ...(currentPeriodEnd ? { currentPeriodEnd } : {}),
         },
       });
-      await writeDomainEvent(prisma, {
-        tenantId,
-        type: event.event === 'subscription.charged' ? 'billing.payment_recovered' : 'billing.subscribed',
-        refId: sub.id,
-        payload: { plan },
-      });
+      const type =
+        event.event === 'subscription.activated'
+          ? 'billing.subscribed'
+          : before?.status === 'past_due'
+            ? 'billing.payment_recovered'
+            : 'billing.renewed';
+      await writeDomainEvent(prisma, { tenantId, type, refId: sub.id, payload: { plan } });
       return;
     }
 
