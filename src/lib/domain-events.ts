@@ -11,6 +11,7 @@ export type DomainEventType =
   | 'billing.cancelled'
   | 'billing.payment_failed'
   | 'billing.payment_recovered'
+  | 'billing.renewed'
   | 'billing.trial_expired'
   | 'billing.suspended'
   | 'billing.pending_deletion'
