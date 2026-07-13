@@ -18,6 +18,10 @@ export type Finding = {
   message: string;
   /** Optional field path for the fix-list UI, e.g. "commercial_invoice.total". */
   field?: string;
+  /** Where the finding came from. Deterministic rules omit this (treated as 'rule'); the AI pass sets 'ai'. */
+  source?: 'rule' | 'ai';
+  /** AI-pass only: a suggested correction the human can accept (§3). The AI never edits documents itself. */
+  suggestion?: string;
 };
 
 type Rule = {
