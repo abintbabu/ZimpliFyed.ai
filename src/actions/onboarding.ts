@@ -60,7 +60,7 @@ export async function createOrganization(input: CreateOrgInput): Promise<{ error
     const byIp = await checkRateLimitDb(`orgcreate:ip:${ip}`, 10, 86_400_000);
     if (!byIp.allowed) return { error: 'Daily org-creation limit reached for this network' };
 
-    const owned = await prisma.membership.count({ where: { userId: user.id, role: 'super_admin' } });
+    const owned = await prisma.membership.count({ where: { userId: user.id, role: 'super_admin' } }); // tenant-safe: scoped by userId at org-creation, before any tenant context exists
     if (owned >= MAX_OWNED_TENANTS) return { error: `You can own at most ${MAX_OWNED_TENANTS} organizations` };
   }
 

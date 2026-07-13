@@ -248,7 +248,7 @@ export async function revokeQuoteShareLink(quoteId: string) {
 
 /** Buyer-facing, unauthenticated. Only returns fields safe to expose externally — no internal cost/margin data. */
 export async function getQuoteByShareToken(token: string) {
-  const quote = await prisma.quote.findUnique({
+  const quote = await prisma.quote.findUnique({ // tenant-safe: buyer-facing public share-token lookup, intentionally cross-tenant; returns only externally-safe fields
     where: { shareToken: token },
     include: { lines: true, buyer: true },
   });
@@ -273,12 +273,12 @@ export async function getQuoteByShareToken(token: string) {
 
 /** Buyer-facing action from the public share link: accept or request changes (logged as a buyer activity). */
 export async function respondToSharedQuote(token: string, response: 'accept' | 'request_changes', note?: string) {
-  const found = await prisma.quote.findUnique({ where: { shareToken: token } });
+  const found = await prisma.quote.findUnique({ where: { shareToken: token } }); // tenant-safe: buyer-facing public share-token flow, intentionally cross-tenant
   if (!found) throw new Error('Quote link not found or expired');
   if (found.expiresAt && found.expiresAt < new Date()) throw new Error('This quote link has expired');
 
   if (response === 'accept') {
-    await prisma.quote.update({ where: { id: found.id }, data: { status: 'accepted' } });
+    await prisma.quote.update({ where: { id: found.id }, data: { status: 'accepted' } }); // tenant-safe: id from the verified share-token lookup above
   }
 
   if (found.buyerId) {

@@ -20,7 +20,7 @@ async function syncInvoiceBalance(tenantId: string, invoiceId: string) {
   const balanceDue = Math.max(parseFloat((invoice.total - realized).toFixed(2)), 0);
   const status = balanceDue <= 0.01 ? 'paid' : realized > 0 ? 'partially_paid' : invoice.status === 'paid' || invoice.status === 'partially_paid' ? 'sent' : invoice.status;
 
-  await prisma.invoice.update({ where: { id: invoiceId }, data: { balanceDue, status } });
+  await prisma.invoice.update({ where: { id: invoiceId }, data: { balanceDue, status } }); // tenant-safe: invoiceId verified tenant-owned via findFirst above
 }
 
 export async function recordBankRealization(input: {
@@ -78,7 +78,7 @@ export async function deleteBankRealization(realizationId: string) {
   const realization = await prisma.bankRealization.findFirst({ where: { id: realizationId, tenantId } });
   if (!realization) throw new Error('Not found');
 
-  await prisma.bankRealization.delete({ where: { id: realizationId } });
+  await prisma.bankRealization.delete({ where: { id: realizationId } }); // tenant-safe: realizationId verified tenant-owned via findFirst above
   await syncInvoiceBalance(tenantId, realization.invoiceId);
 
   await writeAudit({

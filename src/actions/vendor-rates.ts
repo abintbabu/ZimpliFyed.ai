@@ -118,7 +118,7 @@ export async function setPreferredVendorRate(rateId: string) {
       where: { tenantId, sku: rate.sku, isPreferred: true },
       data: { isPreferred: false },
     }),
-    prisma.vendorRate.update({ where: { id: rateId }, data: { isPreferred: true } }),
+    prisma.vendorRate.update({ where: { id: rateId }, data: { isPreferred: true } }), // tenant-safe: rateId verified tenant-owned via findFirst above
   ]);
 
   revalidatePath(`/dashboard/vendors/${rate.vendorId}`);

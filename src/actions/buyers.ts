@@ -216,7 +216,7 @@ export async function completeActivity(activityId: string) {
   const activity = await prisma.activity.findFirst({ where: { id: activityId, tenantId } });
   if (!activity) throw new Error('Activity not found');
 
-  await prisma.activity.update({ where: { id: activityId }, data: { doneAt: new Date() } });
+  await prisma.activity.update({ where: { id: activityId }, data: { doneAt: new Date() } }); // tenant-safe: activityId verified tenant-owned via findFirst above
   if (activity.entityType === 'buyer') revalidatePath(`/dashboard/buyers/${activity.entityId}`);
 }
 

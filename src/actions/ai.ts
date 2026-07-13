@@ -51,7 +51,7 @@ export async function submitAiFeedback(interactionId: string, rating: AiFeedback
       update: { rating, note },
     }),
     ...(editedOutput !== undefined
-      ? [prisma.aiInteraction.update({ where: { id: interactionId }, data: { editedOutput: editedOutput as object } })]
+      ? [prisma.aiInteraction.update({ where: { id: interactionId }, data: { editedOutput: editedOutput as object } })] // tenant-safe: interactionId verified tenant-owned via findFirst above
       : []),
   ]);
 }
