@@ -84,16 +84,32 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 type ProviderResult = { text?: string; parsed?: unknown; model: string; inputTokens: number; outputTokens: number };
 
-async function callAnthropic(
-  model: string,
-  args: { system: string; input: string; schema?: z.ZodTypeAny; maxTokens: number },
-): Promise<ProviderResult> {
+/** An image attachment for a vision call — base64-encoded bytes plus its MIME type. Used by the document/
+ * vision pipeline (DEV_PLAN_100 Sprint 4) to extract structured data from receipts, invoices, and screenshots. */
+export type AiImage = { mediaType: string; dataBase64: string };
+
+type ProviderArgs = { system: string; input: string; images?: AiImage[]; schema?: z.ZodTypeAny; maxTokens: number };
+
+/** Build the Anthropic user-message content: image blocks first, then the text prompt. A text-only call keeps
+ * passing a bare string so nothing about the existing flows changes. */
+function anthropicContent(args: ProviderArgs) {
+  if (!args.images?.length) return args.input;
+  return [
+    ...args.images.map((img) => ({
+      type: 'image' as const,
+      source: { type: 'base64' as const, media_type: img.mediaType as 'image/jpeg', data: img.dataBase64 },
+    })),
+    { type: 'text' as const, text: args.input },
+  ];
+}
+
+async function callAnthropic(model: string, args: ProviderArgs): Promise<ProviderResult> {
   if (args.schema) {
     const response = await anthropic.messages.parse({
       model,
       max_tokens: args.maxTokens,
       system: args.system,
-      messages: [{ role: 'user', content: args.input }],
+      messages: [{ role: 'user', content: anthropicContent(args) }],
       output_config: { format: zodOutputFormat(args.schema) },
     });
     if (!response.parsed_output) throw new Error('Model returned no structured output');
@@ -109,7 +125,7 @@ async function callAnthropic(
     model,
     max_tokens: args.maxTokens,
     system: args.system,
-    messages: [{ role: 'user', content: args.input }],
+    messages: [{ role: 'user', content: anthropicContent(args) }],
   });
   const textBlock = response.content.find((b) => b.type === 'text');
   return {
@@ -120,10 +136,7 @@ async function callAnthropic(
   };
 }
 
-async function callGemini(
-  model: string,
-  args: { system: string; input: string; schema?: z.ZodTypeAny; maxTokens: number },
-): Promise<ProviderResult> {
+async function callGemini(model: string, args: ProviderArgs): Promise<ProviderResult> {
   const generationConfig: Record<string, unknown> = { maxOutputTokens: args.maxTokens };
   if (args.schema) {
     generationConfig.responseMimeType = 'application/json';
@@ -132,6 +145,11 @@ async function callGemini(
     generationConfig.responseSchema = schema;
   }
 
+  const parts = [
+    ...(args.images ?? []).map((img) => ({ inlineData: { mimeType: img.mediaType, data: img.dataBase64 } })),
+    { text: args.input },
+  ];
+
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
     {
@@ -139,7 +157,7 @@ async function callGemini(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: args.system }] },
-        contents: [{ role: 'user', parts: [{ text: args.input }] }],
+        contents: [{ role: 'user', parts }],
         generationConfig,
       }),
     },
@@ -160,10 +178,7 @@ async function callGemini(
   return { ...result, text: content };
 }
 
-async function callProvider(
-  candidate: ModelCandidate,
-  args: { system: string; input: string; schema?: z.ZodTypeAny; maxTokens: number },
-): Promise<ProviderResult> {
+async function callProvider(candidate: ModelCandidate, args: ProviderArgs): Promise<ProviderResult> {
   return candidate.provider === 'anthropic' ? callAnthropic(candidate.model, args) : callGemini(candidate.model, args);
 }
 
@@ -171,6 +186,8 @@ export type AiTask<TSchema extends z.ZodTypeAny | undefined = undefined> = {
   flowId: string;
   tier: AiTier;
   input: string;
+  /** Optional image attachments for a vision call (Sprint 4 document/vision pipeline). */
+  images?: AiImage[];
   tenantId: string;
   userId?: string;
   schema?: TSchema;
@@ -256,7 +273,7 @@ export async function runAi(task: AiTask<z.ZodTypeAny | undefined>): Promise<AiR
     for (let attempt = 0; attempt < RETRIES_PER_MODEL; attempt++) {
       try {
         const result = await withTimeout(
-          callProvider(candidate, { system, input: task.input, schema: task.schema, maxTokens }),
+          callProvider(candidate, { system, input: task.input, images: task.images, schema: task.schema, maxTokens }),
           TIMEOUT_MS,
         );
         const latencyMs = Date.now() - start;
