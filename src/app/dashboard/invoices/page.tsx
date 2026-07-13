@@ -2,11 +2,14 @@ import Link from 'next/link';
 import { Receipt } from 'lucide-react';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
-import { listInvoices } from '@/actions/invoices';
+import { listInvoices, listInvoiceTemplates } from '@/actions/invoices';
+import { listOrders } from '@/actions/orders';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { DataTable, type DataTableColumn } from '@/components/dashboard/data-table';
 import { Badge, statusTone } from '@/components/dashboard/badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
+import { NewInvoiceForm, type TemplateOption } from './new-invoice-form';
+import { InvoiceTemplates } from './invoice-templates';
 
 type Invoice = Awaited<ReturnType<typeof listInvoices>>[number];
 
@@ -20,7 +23,21 @@ export default async function InvoicesPage() {
     return <p className="text-sm text-muted">You do not have access to invoices.</p>;
   }
 
-  const invoices = await listInvoices(tenantId);
+  const canWrite = hasPermission(role, 'invoices:write');
+  const [invoices, rawTemplates, orders] = await Promise.all([
+    listInvoices(tenantId),
+    canWrite ? listInvoiceTemplates(tenantId) : Promise.resolve([]),
+    canWrite ? listOrders(tenantId) : Promise.resolve([]),
+  ]);
+
+  const templates: TemplateOption[] = rawTemplates.map((t) => ({
+    id: t.id,
+    name: t.name,
+    currency: t.currency,
+    dueDays: t.dueDays,
+    isCreditOrDebitNote: t.isCreditOrDebitNote,
+    lines: Array.isArray(t.lines) ? (t.lines as TemplateOption['lines']) : [],
+  }));
 
   const columns: DataTableColumn<Invoice>[] = [
     {
@@ -59,7 +76,20 @@ export default async function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Invoices" />
+      <PageHeader
+        title="Invoices"
+        actions={
+          canWrite && (
+            <div className="flex flex-wrap items-center gap-2">
+              <InvoiceTemplates templates={templates} />
+              <NewInvoiceForm
+                templates={templates}
+                orders={orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber }))}
+              />
+            </div>
+          )
+        }
+      />
 
       <DataTable
         columns={columns}

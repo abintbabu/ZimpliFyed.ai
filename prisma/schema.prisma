@@ -122,6 +122,10 @@ model Tenant {
   jobs               Job[]
   integrationCredentials IntegrationCredential[]
   expenses           Expense[]
+  featureFlags       FeatureFlag[]
+  invoiceTemplates   InvoiceTemplate[]
+  inboxChannels      InboxChannel[]
+  inboxMessages      InboxMessage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -611,6 +615,9 @@ model Invoice {
   lines             InvoiceLineItem[]
   bankRealizations  BankRealization[]
 
+  templateId String?
+  template   InvoiceTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -642,6 +649,28 @@ model BankRealization {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, invoiceId])
+}
+
+// Reusable invoice presets (recurring charges, standard fee schedules). A
+// template holds default currency/terms plus a set of line items stored as
+// JSON; "New invoice" can pre-fill from one. Read via src/actions/invoices.ts.
+model InvoiceTemplate {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name                String
+  currency            String    @default("USD")
+  dueDays             Int?
+  isCreditOrDebitNote Boolean   @default(false)
+  lines               Json      @default("[]")
+
+  invoices Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
 }
 
 model InvoiceLineItem {
@@ -1444,6 +1473,101 @@ model KnowledgeChunk {
   @@index([packId, supersededAt])
 }
 
+// ─── Unified inbox (Stage 2 — INBOX_SPEC) ──────────────────────────────────
+//
+// The exporter's inbound stream (buyer email, WhatsApp, forwarder replies) pulled into one triage
+// surface so nothing lives only in Gmail. A Channel is a connected source (its live credential, when
+// any, lives in IntegrationCredential keyed by the same kind/account); a Message is one normalized
+// inbound item. Providers are pluggable behind src/lib/inbox/provider.ts — the "manual" provider needs
+// no credential and accepts pasted/webhooked text today, so the whole triage flow works before a live
+// Gmail/IMAP/WhatsApp connector is wired.
+
+enum InboxChannelKind {
+  manual
+  email
+  gmail
+  imap
+  whatsapp
+}
+
+enum InboxChannelStatus {
+  active
+  paused
+  error
+}
+
+enum InboxMessageStatus {
+  unread
+  triaged
+  archived
+}
+
+model InboxChannel {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  kind   InboxChannelKind
+  /** Human label + the address/number this channel watches (e.g. "sales@acme.com", "+9198..."). */
+  name       String
+  identifier String?
+  /** Sub-account discriminator that ties this channel to its IntegrationCredential row (kind+account). */
+  account    String             @default("")
+  status     InboxChannelStatus @default(active)
+
+  /** Watermark for incremental provider polling (Gmail historyId / IMAP UID / last fetch time). */
+  lastSyncCursor String?
+  lastSyncedAt   DateTime?
+  lastError      String?
+
+  messages InboxMessage[]
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId, status])
+}
+
+model InboxMessage {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  channelId String
+  channel   InboxChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  /** Provider-native id, unique per channel — the idempotency guard against re-ingesting the same item. */
+  externalMessageId String?
+
+  fromName    String?
+  fromAddress String?
+  subject     String?
+  body        String
+  receivedAt  DateTime @default(now())
+
+  status InboxMessageStatus @default(unread)
+
+  // AI triage output (null until the inbox.ingest job runs): a coarse intent so the queue can be sorted,
+  // a one-line summary, and the AiInteraction link for eval/audit.
+  category        String?
+  summary         String?
+  aiInteractionId String?
+
+  // Polymorphic link to whatever this message was triaged into (mirrors Activity's entityType/entityId).
+  linkedEntityType String? // "lead" | "buyer" | "order" | "quote"
+  linkedEntityId   String?
+
+  triagedByUserId String?
+  triagedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([channelId, externalMessageId])
+  @@index([tenantId, status, receivedAt])
+}
+
 // ─── Async job queue (DEV_PLAN_100 Sprint 1) ────────────────────────────────
 //
 // Postgres-backed durable queue. Follows the codebase's "Postgres table + polling worker"
@@ -1536,4 +1660,65 @@ model WebhookEvent {
   processedAt DateTime        @default(now())
 
   @@unique([provider, eventId])
+}
+
+// ─── Platform admin console (SELF_SERVE_PLAN §6, Phase D) ───────────────────
+
+/**
+ * Per-tenant feature flag for gradual rollouts. Absence of a row = "use the
+ * code default"; a row pins the flag on/off for that tenant. Keyed by string
+ * so new flags ship without a migration. Read via src/lib/feature-flags.ts.
+ */
+model FeatureFlag {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  key     String
+  enabled Boolean
+
+  /** Platform user who last set it (audit convenience; full trail in PlatformAuditEntry). */
+  setByEmail String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+}
+
+enum PlatformAuditAction {
+  impersonate_start
+  feature_flag_set
+  tenant_suspend
+  tenant_reactivate
+  slug_reclaim
+  plan_override
+}
+
+/**
+ * Platform-staff actions on tenants (SELF_SERVE_PLAN §6). Distinct from the
+ * per-tenant AuditEntry: the actor is a Zimplifyed employee, not a tenant
+ * member, and impersonation/lifecycle events must be traceable independent of
+ * (and visible to) the affected tenant. Not scoped by the tenant-isolation
+ * rules — this is the one log platform admins own.
+ */
+model PlatformAuditEntry {
+  id String @id @default(cuid())
+
+  actorUserId String
+  actorEmail  String
+  action      PlatformAuditAction
+
+  /** Target tenant (nullable for future account-level actions). */
+  tenantId   String?
+  tenantSlug String?
+
+  summary  String
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([createdAt])
 }

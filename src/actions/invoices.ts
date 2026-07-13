@@ -41,6 +41,7 @@ export async function getInvoice(tenantId: string, invoiceId: string) {
 export async function createInvoice(input: {
   invoiceNumber: string;
   orderId?: string;
+  templateId?: string;
   currency?: string;
   dueDate?: Date;
   isCreditOrDebitNote?: boolean;
@@ -57,6 +58,7 @@ export async function createInvoice(input: {
       tenantId,
       invoiceNumber: input.invoiceNumber,
       orderId: input.orderId || null,
+      templateId: input.templateId || null,
       currency: input.currency || 'USD',
       total,
       balanceDue: total,
@@ -143,4 +145,90 @@ export async function updateInvoiceStatus(invoiceId: string, status: InvoiceStat
 
   revalidatePath('/dashboard/invoices');
   revalidatePath(`/dashboard/invoices/${invoiceId}`);
+}
+
+// ─── Invoice templates ──────────────────────────────────────────────────────
+
+type TemplateLine = {
+  description: string;
+  quantity: number;
+  cost: number;
+  expensePct?: number;
+  marginPct?: number;
+  unitPrice: number;
+};
+
+function normalizeTemplateLines(lines: TemplateLine[]) {
+  return lines
+    .filter((l) => l.description?.trim())
+    .map((l) => ({
+      description: l.description.trim(),
+      quantity: Number(l.quantity) || 1,
+      cost: Number(l.cost) || 0,
+      expensePct: l.expensePct != null ? Number(l.expensePct) : DEFAULT_EXPENSE_PCT,
+      marginPct: l.marginPct != null ? Number(l.marginPct) : DEFAULT_MARGIN_PCT,
+      unitPrice: Number(l.unitPrice) || 0,
+    }));
+}
+
+export async function listInvoiceTemplates(tenantId: string) {
+  return prisma.invoiceTemplate.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } });
+}
+
+export async function createInvoiceTemplate(input: {
+  name: string;
+  currency?: string;
+  dueDays?: number;
+  isCreditOrDebitNote?: boolean;
+  lines: TemplateLine[];
+}) {
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
+  if (!hasPermission(role, 'invoices:write')) throw new Error('You do not have permission to manage invoice templates');
+  if (!input.name.trim()) throw new Error('Template name is required');
+
+  const template = await prisma.invoiceTemplate.create({
+    data: {
+      tenantId,
+      name: input.name.trim(),
+      currency: input.currency || 'USD',
+      dueDays: input.dueDays ?? null,
+      isCreditOrDebitNote: input.isCreditOrDebitNote ?? false,
+      lines: normalizeTemplateLines(input.lines),
+    },
+  });
+
+  await writeAudit({
+    session,
+    collection: 'invoice_templates',
+    documentId: template.id,
+    action: 'create',
+    summary: `Created invoice template ${template.name}`,
+    after: { name: template.name, currency: template.currency },
+  });
+
+  revalidatePath('/dashboard/invoices');
+  return template;
+}
+
+export async function deleteInvoiceTemplate(templateId: string) {
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
+  if (!hasPermission(role, 'invoices:write')) throw new Error('You do not have permission to manage invoice templates');
+
+  const before = await prisma.invoiceTemplate.findFirst({ where: { id: templateId, tenantId } });
+  if (!before) throw new Error('Template not found');
+
+  await prisma.invoiceTemplate.delete({ where: { id: templateId, tenantId } });
+
+  await writeAudit({
+    session,
+    collection: 'invoice_templates',
+    documentId: templateId,
+    action: 'delete',
+    summary: `Deleted invoice template ${before.name}`,
+    before: { name: before.name },
+  });
+
+  revalidatePath('/dashboard/invoices');
 }
