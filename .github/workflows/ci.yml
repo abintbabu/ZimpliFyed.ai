@@ -1,0 +1,29 @@
+name: CI
+
+# Merge-blocking checks on every PR and push to main (DEV_PLAN_100 Sprint 1).
+# Fast, offline, deterministic — no live DB or AI keys needed. The tenant-isolation
+# scan is the backbone of the zero-cross-tenant-incident KPI (SECURITY_BASELINE §isolation).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Tenant-isolation + crypto security scan
+        run: npm run test:security
+      - name: Doc-engine golden rules (exact-match)
+        run: npm run test:doc-engine
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npx tsc --noEmit

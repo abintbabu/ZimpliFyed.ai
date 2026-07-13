@@ -104,6 +104,8 @@ model Tenant {
   documents          Document[]
   costSheets         CostSheet[]
   exportDocuments    ExportDocument[]
+  docSets            DocSet[]
+  docCounters        DocCounter[]
   hsCodes            HsCode[]
   complianceItems    ComplianceItem[]
   shipmentMilestones ShipmentMilestone[]
@@ -117,6 +119,8 @@ model Tenant {
   activities         Activity[]
   products           Product[]
   priceLists         PriceList[]
+  jobs               Job[]
+  integrationCredentials IntegrationCredential[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -694,6 +698,7 @@ model Order {
   invoices           Invoice[]
   buyerTracks        OrderBuyerTrack[]
   exportDocuments    ExportDocument[]
+  docSets            DocSet[]
   shipmentMilestones ShipmentMilestone[]
   lettersOfCredit    LetterOfCredit[]
   incentiveClaims    IncentiveClaim[]
@@ -713,6 +718,12 @@ enum ExportDocumentType {
   certificate_of_origin
 }
 
+enum DocSetStatus {
+  draft
+  approved
+  superseded
+}
+
 model ExportDocument {
   id       String @id @default(cuid())
   tenantId String
@@ -727,11 +738,68 @@ model ExportDocument {
   // Snapshot of the field values the document was generated with (buyer info, line items, etc.)
   data Json
 
+  // DOC_ENGINE_SPEC §5 (step 2/3): the typed intermediate the templates + validators read, the
+  // per-document number (PI-2026-0042), and any findings attached to this specific document.
+  docSetId  String?
+  docSet    DocSet? @relation(fields: [docSetId], references: [id], onDelete: Cascade)
+  docNumber String?
+  docModel  Json?
+  findings  Json?
+
   createdByUserId String
   createdAt       DateTime @default(now())
 
   @@unique([orderId, type, version])
   @@index([tenantId, orderId])
+  @@index([docSetId])
+}
+
+// DOC_ENGINE_SPEC §5 — a generated, versioned, cross-validated set of documents for one order.
+model DocSet {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  version Int
+  status  DocSetStatus @default(draft)
+
+  /** Immutable DocContext snapshot the set was generated from (reproducibility, diffing). */
+  contextSnapshot Json
+  /** Deterministic rule-engine findings for the whole set (§2). */
+  ruleFindings Json?
+  /** AI consistency-pass findings for the whole set (§3), filled in Sprint 3. */
+  aiFindings Json?
+
+  /** Tokenized share link for buyer/CHA — no login (mirrors Quote.shareToken). */
+  shareToken String?   @unique
+  expiresAt  DateTime?
+
+  documents ExportDocument[]
+
+  generatedByUserId String
+  meteredAt         DateTime?
+  approvedAt        DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@unique([orderId, version])
+  @@index([tenantId, orderId])
+}
+
+// DOC_ENGINE_SPEC §1.2 — per-tenant, per-series, per-year document numbering with tx-safe increment.
+model DocCounter {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /** Series prefix, e.g. "PI" | "CI" | "PL" | "COO". */
+  series String
+  year   Int
+  next   Int    @default(1)
+
+  @@unique([tenantId, series, year])
 }
 
 model OrderBuyerTrack {
@@ -1322,6 +1390,88 @@ model KnowledgeChunk {
 
   @@index([packId])
   @@index([packId, supersededAt])
+}
+
+// ─── Async job queue (DEV_PLAN_100 Sprint 1) ────────────────────────────────
+//
+// Postgres-backed durable queue. Follows the codebase's "Postgres table + polling worker"
+// convention (see domain-events.ts) rather than adding pg-boss — this table IS the swap
+// point for SQS/QStash at Stage 5 (~10k users). Producers never change when the transport does.
+
+enum JobStatus {
+  queued
+  active
+  completed
+  failed
+}
+
+model Job {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /** Handler name registered in src/lib/jobs/handlers.ts */
+  kind    String
+  payload Json?
+
+  /** Optional idempotency key — a unique enqueue guard so retries/webhook replays don't double-run. */
+  idempotencyKey String?
+
+  status      JobStatus @default(queued)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+
+  /** Earliest time a worker may claim this job (backoff / scheduled work). */
+  runAfter  DateTime  @default(now())
+  /** Lease marker so a crashed worker's in-flight job can be reclaimed after the lease expires. */
+  lockedAt  DateTime?
+  lockedBy  String?
+
+  lastError   String?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, idempotencyKey])
+  @@index([status, runAfter])
+  @@index([tenantId])
+}
+
+// ─── Integration credential vault (DEV_PLAN_100 Sprint 1; SECURITY_BASELINE §credential-vault) ──
+//
+// Envelope-encrypted secrets for tenant integrations (Gmail/IMAP tokens, WhatsApp keys, GSP creds).
+// The ciphertext, per-record data-key (itself wrapped by the master key), IV and auth tag live here;
+// plaintext is only ever materialized in memory via src/lib/crypto/vault.ts. Never logged, never
+// returned to the client. See INBOX_SPEC / SECURITY_BASELINE.
+
+model IntegrationCredential {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /** Logical integration, e.g. "gmail" | "imap" | "whatsapp" | "gsp" | "account_aggregator". */
+  kind    String
+  /** Sub-account discriminator (a specific mailbox / phone number). Empty string = the tenant-default
+   * account; kept non-null so the (tenantId, kind, account) unique index dedupes correctly — Postgres
+   * treats NULLs as distinct, which would silently allow duplicate credentials. */
+  account String @default("")
+
+  /** AES-256-GCM envelope. dataKey is wrapped by the master key (CRED_VAULT_MASTER_KEY). */
+  ciphertext    String
+  wrappedKey    String
+  iv            String
+  authTag       String
+  keyIv         String
+  keyAuthTag    String
+  keyVersion    Int    @default(1)
+
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, kind, account])
+  @@index([tenantId])
 }
 
 // ─── Billing (BILLING_SPEC) ────────────────────────────────────────────────
