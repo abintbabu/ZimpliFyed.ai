@@ -16,6 +16,11 @@ const TOOLS = [
     title: 'HS code finder',
     desc: 'Describe your product and get an AI-estimated ITC-HS code with duty and RoDTEP rate hints.',
   },
+  {
+    href: '/tools/lc-checker',
+    title: 'LC discrepancy checker',
+    desc: 'Paste your export letter of credit and get an AI read on unworkable clauses and date traps before you ship.',
+  },
 ];
 
 export default function ToolsIndexPage() {
