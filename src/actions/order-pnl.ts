@@ -22,6 +22,12 @@ export async function getOrderPnl(orderId: string) {
     where: { tenantId, orderId, status: { in: ['claimed', 'received'] } },
   });
 
+  // Snapped expenses attributed to this order that have been booked (auto-posted or human-approved).
+  const bookedExpenses = await prisma.expense.findMany({
+    where: { tenantId, orderId, status: { in: ['auto_posted', 'approved'] }, amount: { not: null } },
+    select: { amount: true },
+  });
+
   return computeOrderPnl({
     quote: order.quote ? { total: order.quote.total, lines: order.quote.lines } : null,
     costSheet: order.quote?.costSheet
@@ -34,5 +40,6 @@ export async function getOrderPnl(orderId: string) {
       : null,
     invoices: order.invoices.map((i) => ({ total: i.total, isCreditOrDebitNote: i.isCreditOrDebitNote })),
     incentiveAmounts: incentiveClaims.map((c) => c.amount),
+    bookedExpenses: bookedExpenses.map((e) => e.amount!),
   });
 }
