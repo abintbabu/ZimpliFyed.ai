@@ -6,6 +6,7 @@ import { buildDocContext, type MissingField } from './context';
 import { buildDocModel, type DocModel, type DocType } from './models';
 import { nextDocNumber } from './numbering';
 import { runRules, type Finding } from './rules';
+import { runAiConsistencyPass } from './ai-consistency';
 
 /**
  * Doc-set generation flow (DOC_ENGINE_SPEC §1.3, build steps 2–3).
@@ -13,13 +14,15 @@ import { runRules, type Finding } from './rules';
  *   1. Build + validate DocContext → fix-list if incomplete (no partial sets).
  *   2. Build every requested DocModel (pure, from the one context snapshot).
  *   3. Deterministic rule pass over the whole set.
- *   4. (AI consistency pass — Sprint 3.)
+ *   4. AI consistency pass over the same models (meaning-level findings the rules can't reach).
  *   5. Persist DocSet (version++) + one ExportDocument per type, numbered, findings attached.
  *   6. Meter `doc_set` + emit `docset.generated`.
  *
  * Regeneration after an order edit mints a new version and supersedes the previous set, so history and the
- * field-level diff are preserved. Everything DB-touching happens in one transaction — a half-written set can
- * never exist, and numbering stays collision-free.
+ * field-level diff are preserved. The DB-touching steps (persist/meter/event) run in one transaction — a
+ * half-written set can never exist, and numbering stays collision-free. The AI pass (a network call) runs
+ * AFTER that transaction commits, so a DB connection is never held open across inference, then its findings
+ * are written back; if inference fails the set still stands on its deterministic guarantees.
  */
 
 export type GenerateResult =
@@ -47,7 +50,7 @@ export async function generateDocSet(input: {
   if (!ctxResult.ok) return { ok: false, missing: ctxResult.missing };
   const context = ctxResult.context;
 
-  return prisma.$transaction(async (tx) => {
+  const persisted = await prisma.$transaction(async (tx) => {
     // Version = one past the current highest set for this order; supersede the prior draft/approved set.
     const prior = await tx.docSet.findFirst({
       where: { tenantId, orderId },
@@ -112,11 +115,37 @@ export async function generateDocSet(input: {
     await writeDomainEvent(tx, { tenantId, type: 'docset.generated', refId: docSet.id, payload: { orderId, version, types: input.types } });
 
     return {
-      ok: true,
       docSetId: docSet.id,
       version,
       models: built.map((b) => b.model),
-      findings,
+      ruleFindings: findings,
     };
   });
+
+  // Step 4 — AI consistency pass, outside the transaction (best-effort; never blocks the set).
+  const aiFindings = await runAiConsistencyPass(persisted.models, tenantId, userId);
+  if (aiFindings.length > 0) {
+    await prisma.$transaction(async (tx) => {
+      await tx.docSet.update({ where: { id: persisted.docSetId }, data: { aiFindings: aiFindings as object } });
+      // Attach each AI finding to every document it names, alongside the rule findings already stored.
+      const docs = await tx.exportDocument.findMany({
+        where: { docSetId: persisted.docSetId },
+        select: { id: true, type: true, findings: true },
+      });
+      for (const doc of docs) {
+        const forDoc = aiFindings.filter((f) => f.docTypes.includes(doc.type as DocType));
+        if (forDoc.length === 0) continue;
+        const existing = (doc.findings as Finding[] | null) ?? [];
+        await tx.exportDocument.update({ where: { id: doc.id }, data: { findings: [...existing, ...forDoc] as object } });
+      }
+    });
+  }
+
+  return {
+    ok: true,
+    docSetId: persisted.docSetId,
+    version: persisted.version,
+    models: persisted.models,
+    findings: [...persisted.ruleFindings, ...aiFindings],
+  };
 }
