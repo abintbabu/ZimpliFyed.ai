@@ -220,5 +220,5 @@ export const navLinks = [
   { label: "Journey", href: "/#journey" },
   { label: "Solutions", href: "/#solutions" },
   { label: "Security", href: "/#security" },
-  { label: "Pricing", href: "/#pricing" },
+  { label: "Pricing", href: "/pricing" },
 ] as const;
