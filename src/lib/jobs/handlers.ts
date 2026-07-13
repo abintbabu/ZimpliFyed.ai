@@ -17,6 +17,8 @@ export type JobPayloads = {
   'noop': { note?: string };
   // Sprint 4 (document/vision pipeline) — declared now so producers can be written against the type.
   'pipeline.extract': { documentId: string; docType: string };
+  // Sprint 4: expense snap — extract + classify + gate one uploaded Expense row.
+  'expense.extract': { expenseId: string };
   // Stage 2 (unified inbox) — inbound message normalization + extraction.
   'inbox.ingest': { channelId: string; externalMessageId: string };
 };
@@ -33,6 +35,10 @@ const handlers: { [K in JobKind]?: Handler<K> } = {
     // Deliberately does nothing but prove the worker path. Logged by the worker on completion.
     void payload;
     void ctx;
+  },
+  'expense.extract': async (payload, ctx) => {
+    const { runExpensePipeline } = await import('@/ai/pipelines/expense');
+    await runExpensePipeline(payload.expenseId, ctx.tenantId);
   },
 };
 
