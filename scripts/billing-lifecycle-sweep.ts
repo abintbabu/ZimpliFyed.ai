@@ -1,5 +1,6 @@
 import { prisma } from '../src/lib/prisma';
 import { writeDomainEvent } from '../src/lib/domain-events';
+import { evaluateLifecycle, type LifecycleTenant } from '../src/lib/billing/lifecycle';
 
 /**
  * Tenant lifecycle state machine sweep (BILLING_SPEC §3):
@@ -21,72 +22,61 @@ import { writeDomainEvent } from '../src/lib/domain-events';
  * tenants before anyone runs an actual hard-delete pass.
  */
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-async function sweepTrials() {
-  const expired = await prisma.tenant.findMany({
-    where: { status: 'trial', trialEndsAt: { lt: new Date() } },
+/** All tenants in a non-terminal lifecycle state; the pure machine decides what (if anything) is due for each. */
+async function sweepLifecycle() {
+  const now = new Date();
+  const tenants = await prisma.tenant.findMany({
+    where: { status: { in: ['trial', 'past_due', 'suspended', 'pending_deletion'] } },
   });
-  for (const tenant of expired) {
-    if (tenant.billingProvider) {
-      // Already checked out mid-trial — a subscription webhook will have set them active; just clear the marker.
-      await prisma.tenant.update({ where: { id: tenant.id }, data: { trialEndsAt: null } });
-      continue;
+
+  for (const tenant of tenants) {
+    const view: LifecycleTenant = {
+      status: tenant.status,
+      trialEndsAt: tenant.trialEndsAt,
+      pastDueSince: tenant.pastDueSince,
+      suspendedAt: tenant.suspendedAt,
+      pendingDeletionAt: tenant.pendingDeletionAt,
+      hasProvider: Boolean(tenant.billingProvider),
+    };
+    const decision = evaluateLifecycle(view, now);
+
+    switch (decision.action) {
+      case 'none':
+        break;
+      case 'clear_trial_marker':
+        // Already checked out mid-trial — a subscription webhook set them active; just clear the marker.
+        await prisma.tenant.update({ where: { id: tenant.id }, data: { trialEndsAt: null } });
+        break;
+      case 'downgrade_to_free':
+        await prisma.tenant.update({ where: { id: tenant.id }, data: { plan: 'free', status: 'active', trialEndsAt: null } });
+        await writeDomainEvent(prisma, { tenantId: tenant.id, type: decision.event });
+        console.log(`[trial] ${tenant.slug}: downgraded to free`);
+        break;
+      case 'suspend':
+        await prisma.tenant.update({ where: { id: tenant.id }, data: { status: 'suspended', suspendedAt: now } });
+        await writeDomainEvent(prisma, { tenantId: tenant.id, type: decision.event });
+        console.log(`[dunning] ${tenant.slug}: suspended`);
+        break;
+      case 'dunning_nudge':
+        await writeDomainEvent(prisma, { tenantId: tenant.id, type: decision.event, payload: { day: decision.day } });
+        console.log(`[dunning] ${tenant.slug}: nudge day ${decision.day} (no email provider wired — logged only)`);
+        break;
+      case 'to_pending_deletion':
+        await prisma.tenant.update({ where: { id: tenant.id }, data: { status: 'pending_deletion', pendingDeletionAt: now } });
+        await writeDomainEvent(prisma, { tenantId: tenant.id, type: decision.event });
+        console.log(`[suspended] ${tenant.slug}: moved to pending_deletion (60d suspended)`);
+        break;
+      case 'to_deleted':
+        await prisma.tenant.update({ where: { id: tenant.id }, data: { status: 'deleted' } });
+        await writeDomainEvent(prisma, { tenantId: tenant.id, type: decision.event });
+        console.log(`[pending_deletion] ${tenant.slug}: flagged status=deleted — REVIEW MANUALLY before any hard delete`);
+        break;
     }
-    await prisma.tenant.update({
-      where: { id: tenant.id },
-      data: { plan: 'free', status: 'active', trialEndsAt: null },
-    });
-    await writeDomainEvent(prisma, { tenantId: tenant.id, type: 'billing.trial_expired' });
-    console.log(`[trial] ${tenant.slug}: downgraded to free`);
-  }
-}
-
-async function sweepDunning() {
-  const pastDue = await prisma.tenant.findMany({
-    where: { status: 'past_due', pastDueSince: { not: null } },
-  });
-  for (const tenant of pastDue) {
-    const daysPastDue = Math.floor((Date.now() - tenant.pastDueSince!.getTime()) / DAY_MS);
-
-    if (daysPastDue >= 15) {
-      await prisma.tenant.update({ where: { id: tenant.id }, data: { status: 'suspended', suspendedAt: new Date() } });
-      await writeDomainEvent(prisma, { tenantId: tenant.id, type: 'billing.suspended' });
-      console.log(`[dunning] ${tenant.slug}: suspended (${daysPastDue}d past due)`);
-    } else if ([1, 4, 8].includes(daysPastDue)) {
-      await writeDomainEvent(prisma, { tenantId: tenant.id, type: 'billing.dunning_nudge', payload: { day: daysPastDue } });
-      console.log(`[dunning] ${tenant.slug}: nudge day ${daysPastDue} (no email provider wired — logged only)`);
-    }
-  }
-}
-
-async function sweepSuspended() {
-  const suspended = await prisma.tenant.findMany({
-    where: { status: 'suspended', suspendedAt: { lt: new Date(Date.now() - 60 * DAY_MS) } },
-  });
-  for (const tenant of suspended) {
-    await prisma.tenant.update({ where: { id: tenant.id }, data: { status: 'pending_deletion', pendingDeletionAt: new Date() } });
-    await writeDomainEvent(prisma, { tenantId: tenant.id, type: 'billing.pending_deletion' });
-    console.log(`[suspended] ${tenant.slug}: moved to pending_deletion (60d suspended)`);
-  }
-}
-
-async function sweepPendingDeletion() {
-  const due = await prisma.tenant.findMany({
-    where: { status: 'pending_deletion', pendingDeletionAt: { lt: new Date(Date.now() - 7 * DAY_MS) } },
-  });
-  for (const tenant of due) {
-    await prisma.tenant.update({ where: { id: tenant.id }, data: { status: 'deleted' } });
-    await writeDomainEvent(prisma, { tenantId: tenant.id, type: 'billing.deleted' });
-    console.log(`[pending_deletion] ${tenant.slug}: flagged status=deleted — REVIEW MANUALLY before any hard delete`);
   }
 }
 
 async function main() {
-  await sweepTrials();
-  await sweepDunning();
-  await sweepSuspended();
-  await sweepPendingDeletion();
+  await sweepLifecycle();
 }
 
 main()

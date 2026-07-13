@@ -5,6 +5,7 @@ import { listIncentiveClaims } from '@/actions/incentive-claims';
 import { listOrders } from '@/actions/orders';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { StatCard } from '@/components/dashboard/stat-card';
+import { AdvisoryDisclaimer } from '@/components/advisory-disclaimer';
 import { IncentiveClaimsList } from './incentive-claims-list';
 import { NewIncentiveClaimForm } from './new-incentive-claim-form';
 
@@ -34,6 +35,8 @@ export default async function IncentivesPage() {
       </div>
 
       <IncentiveClaimsList claims={claims} canWrite={canWrite} />
+
+      <AdvisoryDisclaimer kind="gst" />
     </div>
   );
 }

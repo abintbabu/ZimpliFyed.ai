@@ -34,6 +34,22 @@ export const PLANS: Record<TenantPlan, PlanEntitlements> = {
   enterprise: { label: 'Enterprise', seats: -1, aiActions: 100000, docSets: 100000, features: BUSINESS_FEATURES, branding: false },
 };
 
+/**
+ * Published monthly list price in INR (CFO_FINANCE_PRICING §2; MASTER_LAUNCH_PLAN pricing table).
+ * -1 = "custom / talk to us". These are the launch price points pending founder confirmation before the
+ * 2026 Q4 paid launch (a MASTER_LAUNCH_PLAN founder decision) — keep the pricing page reading from here so
+ * a change is one edit.
+ */
+export const MONTHLY_INR: Record<TenantPlan, number> = {
+  free: 0,
+  starter: 1499,
+  growth: 4999,
+  enterprise: -1,
+};
+
+/** Metered overage rates (CFO_FINANCE_PRICING §2), shown on the pricing page against the ~₹4,000 CHA anchor. */
+export const OVERAGE_INR = { aiActionsPer100: 199, docSet: 99 } as const;
+
 export function planFeatures(plan: TenantPlan): Feature[] {
   return PLANS[plan].features;
 }
