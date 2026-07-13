@@ -1,0 +1,49 @@
+import 'server-only';
+
+/**
+ * Job handler registry (DEV_PLAN_100 Sprint 1).
+ *
+ * Each async workflow registers one handler here with a typed payload. The queue (queue.ts) is
+ * transport; this file is the map of what can run. Handlers are plain async functions — they must be
+ * idempotent (a job may run more than once on crash-retry) and must not assume any ambient request
+ * context: everything they need comes from the payload plus the tenantId.
+ *
+ * Sprint-4 pipelines (expense extraction), Stage-2 inbox ingestion, and Stage-3 AgentRun steps all
+ * register here. Kept intentionally small at Sprint 1 — one real handler plus the shape for the rest.
+ */
+
+export type JobPayloads = {
+  // Sprint 1: a trivial handler proving the loop end-to-end and usable as a health probe.
+  'noop': { note?: string };
+  // Sprint 4 (document/vision pipeline) — declared now so producers can be written against the type.
+  'pipeline.extract': { documentId: string; docType: string };
+  // Stage 2 (unified inbox) — inbound message normalization + extraction.
+  'inbox.ingest': { channelId: string; externalMessageId: string };
+};
+
+export type JobKind = keyof JobPayloads;
+
+export type JobContext = { tenantId: string; jobId: string; attempts: number };
+
+type Handler<K extends JobKind> = (payload: JobPayloads[K], ctx: JobContext) => Promise<void>;
+
+/** The registry. New handlers are added here as their sprints land. */
+const handlers: { [K in JobKind]?: Handler<K> } = {
+  noop: async (payload, ctx) => {
+    // Deliberately does nothing but prove the worker path. Logged by the worker on completion.
+    void payload;
+    void ctx;
+  },
+};
+
+export function getHandler<K extends JobKind>(kind: K): Handler<K> | undefined {
+  return handlers[kind];
+}
+
+export function registerHandler<K extends JobKind>(kind: K, handler: Handler<K>): void {
+  (handlers as Record<string, Handler<JobKind>>)[kind] = handler as Handler<JobKind>;
+}
+
+export function registeredKinds(): JobKind[] {
+  return Object.keys(handlers) as JobKind[];
+}
