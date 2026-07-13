@@ -8,6 +8,45 @@ import { writeAudit } from '@/lib/audit';
 import { newStorageKey, putObject } from '@/lib/storage';
 import { enqueue } from '@/lib/jobs/queue';
 
+export type ExpenseRow = {
+  id: string;
+  status: 'pending_review' | 'auto_posted' | 'approved' | 'rejected';
+  vendorName: string | null;
+  amount: number | null;
+  currency: string | null;
+  expenseDate: Date | null;
+  gstHead: string | null;
+  itcEligible: boolean | null;
+  confidence: number | null;
+  mimeType: string;
+  order: { id: string; orderNumber: string } | null;
+  createdAt: Date;
+};
+
+/** List a tenant's expenses, most recent first — the review queue plus the booked history. */
+export async function listExpenses(tenantId: string): Promise<ExpenseRow[]> {
+  const rows = await prisma.expense.findMany({
+    where: { tenantId },
+    orderBy: { createdAt: 'desc' },
+    include: { order: { select: { id: true, orderNumber: true } } },
+    take: 200,
+  });
+  return rows.map((e) => ({
+    id: e.id,
+    status: e.status,
+    vendorName: e.vendorName,
+    amount: e.amount,
+    currency: e.currency,
+    expenseDate: e.expenseDate,
+    gstHead: e.gstHead,
+    itcEligible: e.itcEligible,
+    confidence: e.confidence,
+    mimeType: e.mimeType,
+    order: e.order,
+    createdAt: e.createdAt,
+  }));
+}
+
 /** Files we accept for an expense snap. A cheap type gate — real AV scanning is a follow-up (no scanner wired).
  * PDFs and common photo formats cover receipts, tax-invoice PDFs, and UPI/bank screenshots. */
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf']);
