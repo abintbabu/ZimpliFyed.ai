@@ -17,6 +17,7 @@
     "eval:ai": "tsx src/tests/ai/run.ts",
     "test:security": "tsx --conditions=react-server src/tests/security/vault.test.ts && tsx --conditions=react-server src/tests/security/tenant-isolation.test.ts",
     "test:doc-engine": "tsx --conditions=react-server src/tests/doc-engine/golden.ts",
+    "test:pnl": "tsx src/tests/order-pnl/expenses.test.ts",
     "ingest:corpus": "tsx scripts/ingest-corpus.ts",
     "billing:sweep": "tsx scripts/billing-lifecycle-sweep.ts",
     "compliance:sweep": "tsx scripts/compliance-expiry-sweep.ts",

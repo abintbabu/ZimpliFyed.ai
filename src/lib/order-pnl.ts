@@ -14,6 +14,7 @@ export type OrderPnlInput = {
   } | null;
   invoices: { total: number; isCreditOrDebitNote: boolean }[];
   incentiveAmounts: number[]; // claimed or received incentive claim amounts for this order
+  bookedExpenses: number[]; // auto-posted/approved snapped expenses attributed to this order (Sprint 4)
 };
 
 export type OrderPnlResult = {
@@ -23,6 +24,7 @@ export type OrderPnlResult = {
   actualRevenue: number;
   landedCostPerUnit: number | null;
   incentiveCredits: number;
+  bookedExpenses: number;
   actualMarginPct: number | null;
   hasCostSheet: boolean;
 };
@@ -43,6 +45,7 @@ export function computeOrderPnl(input: OrderPnlInput): OrderPnlResult {
     .reduce((sum, i) => sum + i.total, 0);
 
   const incentiveCredits = input.incentiveAmounts.reduce((sum, a) => sum + a, 0);
+  const bookedExpenses = input.bookedExpenses.reduce((sum, a) => sum + a, 0);
 
   let landedCostPerUnit: number | null = null;
   let actualMarginPct: number | null = null;
@@ -59,10 +62,10 @@ export function computeOrderPnl(input: OrderPnlInput): OrderPnlResult {
     const totalQuantity = input.quote?.lines.reduce((sum, l) => sum + l.quantity, 0) ?? 0;
     const totalLandedCost = landedCostPerUnit * totalQuantity;
     actualMarginPct = actualRevenue > 0
-      ? parseFloat((((actualRevenue + incentiveCredits - totalLandedCost) / actualRevenue) * 100).toFixed(2))
+      ? parseFloat((((actualRevenue + incentiveCredits - totalLandedCost - bookedExpenses) / actualRevenue) * 100).toFixed(2))
       : null;
   } else if (actualRevenue > 0) {
-    actualMarginPct = parseFloat((((actualRevenue + incentiveCredits - quotedCost) / actualRevenue) * 100).toFixed(2));
+    actualMarginPct = parseFloat((((actualRevenue + incentiveCredits - quotedCost - bookedExpenses) / actualRevenue) * 100).toFixed(2));
   }
 
   return {
@@ -72,6 +75,7 @@ export function computeOrderPnl(input: OrderPnlInput): OrderPnlResult {
     actualRevenue: parseFloat(actualRevenue.toFixed(2)),
     landedCostPerUnit,
     incentiveCredits: parseFloat(incentiveCredits.toFixed(2)),
+    bookedExpenses: parseFloat(bookedExpenses.toFixed(2)),
     actualMarginPct,
     hasCostSheet: !!input.costSheet,
   };

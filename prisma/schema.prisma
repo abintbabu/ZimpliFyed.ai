@@ -121,6 +121,7 @@ model Tenant {
   priceLists         PriceList[]
   jobs               Job[]
   integrationCredentials IntegrationCredential[]
+  expenses           Expense[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -702,6 +703,7 @@ model Order {
   shipmentMilestones ShipmentMilestone[]
   lettersOfCredit    LetterOfCredit[]
   incentiveClaims    IncentiveClaim[]
+  expenses           Expense[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -935,6 +937,56 @@ model Document {
   createdAt DateTime @default(now())
 
   @@index([tenantId, collection, documentId])
+}
+
+// ─── Expense capture (Sprint 4 document/vision pipeline) ─────────────────
+// A receipt/invoice/UPI screenshot snapped by the founder, run through the vision pipeline:
+// extract -> classify (GST head + ITC eligibility) -> confidence gate -> auto-post or review queue.
+
+enum ExpenseStatus {
+  pending_review // extraction confidence below the auto-post gate — waits for a human tap
+  auto_posted    // high-confidence extraction, posted straight to the order P&L
+  approved       // a human confirmed a pending_review item
+  rejected       // a human rejected it (bad scan / not an expense)
+}
+
+model Expense {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Order attribution is best-effort — an expense may not map to any single order.
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Source file in object storage (the snapped image / PDF).
+  storageKey String
+  mimeType   String
+
+  // Extracted fields (nullable until the vision pass fills them).
+  vendorName  String?
+  amount      Float?
+  currency    String?
+  expenseDate DateTime?
+
+  // Classification (India pack): GST head + input-tax-credit eligibility.
+  gstHead     String?
+  itcEligible Boolean?
+
+  status     ExpenseStatus @default(pending_review)
+  confidence Float? // 0..1 extraction confidence; drives the auto-post gate
+
+  aiInteractionId String? // links the extraction AiInteraction for audit/eval feedback
+
+  createdByUserId String
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, orderId])
 }
 
 // ─── HS code assistant (AI classification cache) ─────────────────────────
