@@ -3,7 +3,7 @@
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { prisma } from '@/lib/prisma';
-import { getBillingProvider } from '@/lib/billing/stripe-adapter';
+import { getBillingProviderForTenant } from '@/lib/billing/provider';
 import type { OveragePack } from '@/lib/billing/provider';
 import type { TenantPlan } from '@prisma/client';
 
@@ -19,7 +19,8 @@ export async function startCheckoutAction(plan: TenantPlan) {
   const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { email: true } });
   const base = appUrl();
 
-  return getBillingProvider().createCheckout({
+  const provider = await getBillingProviderForTenant(session.tenantId);
+  return provider.createCheckout({
     tenantId: session.tenantId,
     plan,
     customerEmail: user?.email ?? undefined,
@@ -33,7 +34,8 @@ export async function startOverageCheckoutAction(pack: OveragePack) {
   if (!hasPermission(session.role, 'users:manage')) throw new Error('Only owners and admins can manage billing');
 
   const base = appUrl();
-  return getBillingProvider().createOverageCheckout({
+  const provider = await getBillingProviderForTenant(session.tenantId);
+  return provider.createOverageCheckout({
     tenantId: session.tenantId,
     pack,
     successUrl: `${base}/dashboard/settings/billing?checkout=success`,
@@ -46,5 +48,6 @@ export async function openBillingPortalAction() {
   if (!hasPermission(session.role, 'users:manage')) throw new Error('Only owners and admins can manage billing');
 
   const base = appUrl();
-  return getBillingProvider().openPortal({ tenantId: session.tenantId, returnUrl: `${base}/dashboard/settings/billing` });
+  const provider = await getBillingProviderForTenant(session.tenantId);
+  return provider.openPortal({ tenantId: session.tenantId, returnUrl: `${base}/dashboard/settings/billing` });
 }
