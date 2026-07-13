@@ -19,7 +19,8 @@
     "test:doc-engine": "tsx --conditions=react-server src/tests/doc-engine/golden.ts",
     "ingest:corpus": "tsx scripts/ingest-corpus.ts",
     "billing:sweep": "tsx scripts/billing-lifecycle-sweep.ts",
-    "compliance:sweep": "tsx scripts/compliance-expiry-sweep.ts"
+    "compliance:sweep": "tsx scripts/compliance-expiry-sweep.ts",
+    "followup:sweep": "tsx --conditions=react-server scripts/quote-followup-sweep.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

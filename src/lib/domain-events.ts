@@ -5,6 +5,7 @@ export type DomainEventType =
   | 'order.created'
   | 'quote.sent'
   | 'enquiry.quoted'
+  | 'quote.followup_drafted'
   | 'invoice.paid'
   | 'docset.generated'
   | 'milestone.reached'
