@@ -19,8 +19,8 @@ export type JobPayloads = {
   'pipeline.extract': { documentId: string; docType: string };
   // Sprint 4: expense snap — extract + classify + gate one uploaded Expense row.
   'expense.extract': { expenseId: string };
-  // Stage 2 (unified inbox) — inbound message normalization + extraction.
-  'inbox.ingest': { channelId: string; externalMessageId: string };
+  // Stage 2 (unified inbox) — classify one already-persisted inbound message (intent + summary).
+  'inbox.ingest': { messageId: string };
 };
 
 export type JobKind = keyof JobPayloads;
@@ -39,6 +39,10 @@ const handlers: { [K in JobKind]?: Handler<K> } = {
   'expense.extract': async (payload, ctx) => {
     const { runExpensePipeline } = await import('@/ai/pipelines/expense');
     await runExpensePipeline(payload.expenseId, ctx.tenantId);
+  },
+  'inbox.ingest': async (payload, ctx) => {
+    const { runInboxIngest } = await import('@/lib/inbox/ingest');
+    await runInboxIngest(payload.messageId, ctx.tenantId);
   },
 };
 

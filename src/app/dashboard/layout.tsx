@@ -20,6 +20,13 @@ export default async function DashboardLayout({
 
   const visibleItems = DASHBOARD_NAV_ITEMS.filter((item) => isNavVisible(item, membership.role));
 
+  // Platform staff get a link into the internal admin console (§6). This is a
+  // platform-role capability, orthogonal to the tenant permission matrix, so
+  // it's appended here rather than living in DASHBOARD_NAV_ITEMS.
+  if (session.user.platformRole === 'platform_admin') {
+    visibleItems.push({ label: 'Platform admin', href: '/admin', icon: 'ShieldCheck' });
+  }
+
   return (
     <DashboardShell
       navItems={visibleItems}
