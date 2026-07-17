@@ -21,6 +21,7 @@ export const DASHBOARD_NAV_ITEMS: AppNavItem[] = [
   { label: 'Expenses', href: '/dashboard/expenses', icon: 'ScanLine', permission: 'expenses:read' },
   { label: 'Incentives', href: '/dashboard/incentives', icon: 'PiggyBank', permission: 'incentives:read' },
   { label: 'Compliance', href: '/dashboard/compliance', icon: 'ShieldCheck', permission: 'compliance:read' },
+  { label: 'GST prep', href: '/dashboard/gst-prep', icon: 'Calculator', permission: 'compliance:read' },
   { label: 'Screening', href: '/dashboard/screening', icon: 'ShieldAlert', permission: 'compliance:read' },
   { label: 'Tasks', href: '/dashboard/tasks', icon: 'CheckSquare', permission: 'tasks:read' },
   { label: 'Users', href: '/dashboard/users', icon: 'Users2', permission: 'users:manage' },

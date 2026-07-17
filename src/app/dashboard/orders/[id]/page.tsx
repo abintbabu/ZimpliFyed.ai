@@ -4,6 +4,7 @@ import { hasPermission } from '@/lib/permissions';
 import { getOrder } from '@/actions/orders';
 import { listDocuments } from '@/actions/documents';
 import { listExportDocuments } from '@/actions/export-documents';
+import { getOrderDocSet } from '@/actions/doc-sets';
 import { listShipmentMilestones } from '@/actions/shipment-milestones';
 import { listLettersOfCredit } from '@/actions/letters-of-credit';
 import { getOrderPnl } from '@/actions/order-pnl';
@@ -12,6 +13,7 @@ import { DocumentPanel } from '@/components/document-panel';
 import { DocReadinessPanel } from '@/components/doc-readiness-panel';
 import { buildDocContext } from '@/lib/doc-engine/context';
 import { ExportDocumentsPanel } from '@/components/export-documents-panel';
+import { DocSetPanel } from '@/components/doc-set-panel';
 import { ShipmentTimelinePanel } from '@/components/shipment-timeline-panel';
 import { LcAdvisorPanel } from '@/components/lc-advisor-panel';
 import { OrderPnlPanel } from '@/components/order-pnl-panel';
@@ -35,6 +37,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const letterOfCredits = await listLettersOfCredit(tenantId, order.id);
   const pnl = await getOrderPnl(order.id);
   const docContext = await buildDocContext(tenantId, order.id);
+  const docSet = await getOrderDocSet(order.id);
 
   return (
     <div className="space-y-6">
@@ -72,6 +75,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       />
 
       <DocReadinessPanel result={docContext} />
+
+      <DocSetPanel orderId={order.id} initialDocSet={docSet} canWrite={hasPermission(role, 'orders:write')} />
 
       <ExportDocumentsPanel
         orderId={order.id}

@@ -123,8 +123,8 @@ export async function approveExpenseAction(
     if (!order) throw new Error('Order not found');
   }
 
-  await prisma.expense.update({
-    where: { id: expense.id }, // tenant-safe: expenseId verified tenant-owned via findFirst above
+  await prisma.expense.update({ // tenant-safe: expenseId verified tenant-owned via findFirst above
+    where: { id: expense.id },
     data: {
       status: 'approved',
       reviewedByUserId: userId,
@@ -149,8 +149,8 @@ export async function rejectExpenseAction(expenseId: string): Promise<void> {
   const expense = await prisma.expense.findFirst({ where: { id: expenseId, tenantId }, select: { id: true } });
   if (!expense) throw new Error('Expense not found');
 
-  await prisma.expense.update({
-    where: { id: expense.id }, // tenant-safe: expenseId verified tenant-owned via findFirst above
+  await prisma.expense.update({ // tenant-safe: expenseId verified tenant-owned via findFirst above
+    where: { id: expense.id },
     data: { status: 'rejected', reviewedByUserId: userId, reviewedAt: new Date() },
   });
   await writeAudit({ session, collection: 'expenses', documentId: expense.id, action: 'update', summary: 'Rejected expense' });

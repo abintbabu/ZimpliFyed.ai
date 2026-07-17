@@ -19,10 +19,18 @@
     "test:doc-engine": "tsx --conditions=react-server src/tests/doc-engine/golden.ts",
     "test:billing": "tsx src/tests/billing/lifecycle.test.ts",
     "test:pnl": "tsx src/tests/order-pnl/expenses.test.ts",
+    "test:gst-prep": "tsx src/tests/gst-prep/prep-pack.test.ts",
+    "test:landed-cost": "tsx src/tests/pricing/landed-cost.test.ts",
+    "test:pricing": "tsx src/tests/pricing/pricing-buildup.test.ts",
+    "test:compliance": "tsx src/tests/compliance/deadlines.test.ts",
+    "test:access": "tsx src/tests/access/permissions.test.ts",
+    "test:integration": "tsx --conditions=react-server src/tests/integration/features.test.ts",
+    "test": "npm run test:billing && npm run test:pnl && npm run test:landed-cost && npm run test:pricing && npm run test:compliance && npm run test:access && npm run test:security && npm run test:doc-engine",
     "ingest:corpus": "tsx scripts/ingest-corpus.ts",
     "billing:sweep": "tsx scripts/billing-lifecycle-sweep.ts",
     "compliance:sweep": "tsx scripts/compliance-expiry-sweep.ts",
-    "followup:sweep": "tsx --conditions=react-server scripts/quote-followup-sweep.ts"
+    "followup:sweep": "tsx --conditions=react-server scripts/quote-followup-sweep.ts",
+    "inbox:sync-sweep": "tsx --conditions=react-server scripts/inbox-sync-sweep.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

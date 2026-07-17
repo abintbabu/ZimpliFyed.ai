@@ -7,7 +7,8 @@ import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { enqueue } from '@/lib/jobs/queue';
-import { getInboxProvider, ProviderNotConfiguredError } from '@/lib/inbox/provider';
+import { storeCredential } from '@/lib/crypto/vault';
+import { syncChannelCore } from '@/lib/inbox/sync';
 import { runInboxIngest } from '@/lib/inbox/ingest';
 import { draftQuoteFromEnquiry } from '@/actions/enquiry';
 
@@ -96,6 +97,44 @@ export async function createChannel(input: { kind: InboxChannelKind; name: strin
 }
 
 /**
+ * Store (or replace) the vault credential a credentialed channel pulls with — e.g. a Gmail
+ * `{ refresh_token, client_id, client_secret }` JSON blob. The secret is envelope-encrypted at rest by the
+ * vault and never returned to the client. Keyed by (tenantId, channel.kind, channel.account) so it lines up
+ * with what getInboxProvider().fetch() reads. Manual channels have no credential and are rejected.
+ */
+export async function connectChannelCredential(input: { channelId: string; secret: string }) {
+  const session = await requireTenantSession();
+  if (!hasPermission(session.role, 'inbox:write')) throw new Error('You do not have permission to manage the inbox');
+  const secret = input.secret.trim();
+  if (!secret) throw new Error('Paste the channel credential');
+
+  const channel = await prisma.inboxChannel.findFirst({
+    where: { id: input.channelId, tenantId: session.tenantId },
+    select: { id: true, kind: true, account: true, name: true },
+  });
+  if (!channel) throw new Error('Unknown channel');
+  if (channel.kind === 'manual') throw new Error('The manual channel has no credential to connect');
+
+  await storeCredential({ tenantId: session.tenantId, kind: channel.kind, account: channel.account, secret });
+  // A freshly (re)connected channel clears any prior error so the next sync is attempted cleanly.
+  await prisma.inboxChannel.update({ // tenant-safe: channelId verified tenant-owned via findFirst above
+    where: { id: channel.id },
+    data: { status: 'active', lastError: null },
+  });
+
+  await writeAudit({
+    session,
+    collection: 'inbox_channels',
+    documentId: channel.id,
+    action: 'update',
+    summary: `Connected credential for inbox channel "${channel.name}" (${channel.kind})`,
+  });
+
+  revalidatePath(INBOX_PATH);
+  return { ok: true };
+}
+
+/**
  * Drop one inbound message into the inbox. This is the manual/paste path today and the same entry point a
  * live provider webhook would call. Creates the row, then enqueues classification so the UI returns instantly
  * and the intent/summary fill in shortly after.
@@ -176,7 +215,7 @@ export async function triageToLead(messageId: string) {
   const rawText = [message.subject, message.body].filter(Boolean).join('\n\n');
   const draft = await draftQuoteFromEnquiry(rawText);
 
-  await prisma.inboxMessage.update({
+  await prisma.inboxMessage.update({ // tenant-safe: messageId verified tenant-owned via findFirst above
     where: { id: message.id },
     data: {
       status: 'triaged',
@@ -209,62 +248,7 @@ export async function syncChannel(channelId: string) {
   const session = await requireTenantSession();
   if (!hasPermission(session.role, 'inbox:write')) throw new Error('You do not have permission to manage the inbox');
 
-  const channel = await prisma.inboxChannel.findFirst({
-    where: { id: channelId, tenantId: session.tenantId },
-    select: { id: true, kind: true, account: true, lastSyncCursor: true },
-  });
-  if (!channel) throw new Error('Unknown channel');
-
-  const provider = getInboxProvider(channel.kind);
-  if (!provider.canPull) {
-    revalidatePath(INBOX_PATH);
-    return { fetched: 0, pullable: false };
-  }
-
-  try {
-    const { messages, cursor } = await provider.fetch({
-      tenantId: session.tenantId,
-      account: channel.account,
-      cursor: channel.lastSyncCursor,
-    });
-
-    let created = 0;
-    for (const m of messages) {
-      const row = await prisma.inboxMessage.upsert({
-        where: { channelId_externalMessageId: { channelId: channel.id, externalMessageId: m.externalMessageId } },
-        create: {
-          tenantId: session.tenantId,
-          channelId: channel.id,
-          externalMessageId: m.externalMessageId,
-          fromName: m.fromName ?? null,
-          fromAddress: m.fromAddress ?? null,
-          subject: m.subject ?? null,
-          body: m.body,
-          receivedAt: m.receivedAt,
-        },
-        update: {}, // already ingested — dedupe
-        select: { id: true, category: true },
-      });
-      if (!row.category) {
-        created += 1;
-        await enqueue({ tenantId: session.tenantId, kind: 'inbox.ingest', payload: { messageId: row.id } });
-      }
-    }
-
-    await prisma.inboxChannel.update({
-      where: { id: channel.id },
-      data: { lastSyncCursor: cursor, lastSyncedAt: new Date(), status: 'active', lastError: null },
-    });
-
-    revalidatePath(INBOX_PATH);
-    return { fetched: created, pullable: true };
-  } catch (err) {
-    const lastError = err instanceof ProviderNotConfiguredError ? err.message : 'Sync failed — check the channel credential';
-    await prisma.inboxChannel.update({
-      where: { id: channel.id },
-      data: { status: 'error', lastError },
-    });
-    revalidatePath(INBOX_PATH);
-    return { fetched: 0, pullable: true, error: lastError };
-  }
+  const result = await syncChannelCore(channelId, session.tenantId);
+  revalidatePath(INBOX_PATH);
+  return result;
 }

@@ -36,6 +36,49 @@ export async function generateDocSetAction(orderId: string, types: DocType[] = A
   return result;
 }
 
+/** The latest (highest-version) doc-set for an order, with its rendered document models and merged findings,
+ * for the order-page review panel. Returns null when nothing has been generated yet. */
+export async function getOrderDocSet(orderId: string): Promise<{
+  id: string;
+  version: number;
+  status: string;
+  shareToken: string | null;
+  expiresAt: Date | null;
+  approvedAt: Date | null;
+  createdAt: Date;
+  findings: Finding[];
+  documents: { id: string; type: DocType; docNumber: string | null; model: DocModel | null; findings: Finding[] }[];
+} | null> {
+  const { tenantId } = await requireTenantSession();
+  const docSet = await prisma.docSet.findFirst({
+    where: { tenantId, orderId },
+    orderBy: { version: 'desc' },
+    include: { documents: { orderBy: { type: 'asc' } } },
+  });
+  if (!docSet) return null;
+
+  const ruleFindings = (docSet.ruleFindings as Finding[] | null) ?? [];
+  const aiFindings = (docSet.aiFindings as Finding[] | null) ?? [];
+
+  return {
+    id: docSet.id,
+    version: docSet.version,
+    status: docSet.status,
+    shareToken: docSet.shareToken,
+    expiresAt: docSet.expiresAt,
+    approvedAt: docSet.approvedAt,
+    createdAt: docSet.createdAt,
+    findings: [...ruleFindings, ...aiFindings],
+    documents: docSet.documents.map((d) => ({
+      id: d.id,
+      type: d.type as DocType,
+      docNumber: d.docNumber,
+      model: (d.docModel as unknown as DocModel) ?? null,
+      findings: (d.findings as Finding[] | null) ?? [],
+    })),
+  };
+}
+
 /** Approve a draft doc-set: locks it and stamps status. */
 export async function approveDocSetAction(docSetId: string) {
   const session = await requireTenantSession();

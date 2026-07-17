@@ -1,5 +1,6 @@
 import 'server-only';
 import type { InboxChannelKind } from '@prisma/client';
+import { gmailProvider } from './gmail';
 
 /**
  * Inbox provider adapter (Stage 2 — INBOX_SPEC).
@@ -76,9 +77,12 @@ function stubProvider(kind: InboxChannelKind): InboxProvider {
 
 const PROVIDERS: Record<InboxChannelKind, InboxProvider> = {
   manual: manualProvider,
-  // Credentialed connectors — same interface, wired as each integration lands.
+  // Gmail is a live, credentialed connector (fetch-based REST, OAuth refresh-token from the vault).
+  gmail: gmailProvider,
+  // Remaining credentialed connectors — same interface, wired as each integration lands. `imap` needs a TCP
+  // client library; `whatsapp` is webhook-native (Meta Cloud API pushes inbound), so it is fed via its
+  // webhook route into ingestMessage rather than pulled here. `email` is the generic forwarding alias.
   email: stubProvider('email'),
-  gmail: stubProvider('gmail'),
   imap: stubProvider('imap'),
   whatsapp: stubProvider('whatsapp'),
 };

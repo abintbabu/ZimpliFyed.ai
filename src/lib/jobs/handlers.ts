@@ -21,6 +21,8 @@ export type JobPayloads = {
   'expense.extract': { expenseId: string };
   // Stage 2 (unified inbox) — classify one already-persisted inbound message (intent + summary).
   'inbox.ingest': { messageId: string };
+  // Stage 2 (unified inbox) — pull new messages from one pullable channel's provider (e.g. Gmail).
+  'inbox.sync': { channelId: string };
 };
 
 export type JobKind = keyof JobPayloads;
@@ -43,6 +45,10 @@ const handlers: { [K in JobKind]?: Handler<K> } = {
   'inbox.ingest': async (payload, ctx) => {
     const { runInboxIngest } = await import('@/lib/inbox/ingest');
     await runInboxIngest(payload.messageId, ctx.tenantId);
+  },
+  'inbox.sync': async (payload, ctx) => {
+    const { syncChannelCore } = await import('@/lib/inbox/sync');
+    await syncChannelCore(payload.channelId, ctx.tenantId);
   },
 };
 
