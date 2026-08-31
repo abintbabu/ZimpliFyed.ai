@@ -1,4 +1,5 @@
 import type { DocContext } from './context';
+import { amountInWords } from './num-to-words';
 
 /**
  * DocModel layer (DOC_ENGINE_SPEC §1.2, build step 2).
@@ -51,6 +52,20 @@ export type ExporterIdentity = {
   address: string;
   iecNumber: string;
   gstin: string;
+  adCode: string;
+};
+
+/**
+ * Remittance details. DocContext has always required these (a tenant can't generate documents without
+ * them) but no model carried them, so nothing printed — a proforma invoice with no bank block is one the
+ * buyer cannot actually pay against. Invoice-type documents render this; PL/COO deliberately do not.
+ */
+export type BankDetails = {
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+  ifscOrSwift: string;
+  adCode: string;
 };
 
 /** The union — every doc type shares a header (number, title, exporter, buyer, incoterm) and adds its body. */
@@ -62,8 +77,11 @@ export type DocModel =
 
 export type DocHeader = {
   docNumber: string;
+  /** Issue date as `YYYY-MM-DD`. Carried on the context snapshot, never read from the clock here — builders stay pure. */
+  issuedAt: string;
   title: string;
   exporter: ExporterIdentity;
+  bank: BankDetails;
   buyer: Party;
   incoterm: string;
   originPort: string;
@@ -72,7 +90,7 @@ export type DocHeader = {
   currency: string;
 };
 
-export type InvoiceBody = { lines: InvoiceLine[]; total: number };
+export type InvoiceBody = { lines: InvoiceLine[]; total: number; totalInWords: string };
 export type PackingBody = { lines: PackingLine[]; totalQuantity: number };
 export type OriginBody = { lines: PackingLine[]; countryOfOrigin: string; declaration: string };
 
@@ -83,12 +101,23 @@ function round2(n: number): number {
 function header(ctx: DocContext, type: DocType, docNumber: string): DocHeader {
   return {
     docNumber,
+    issuedAt: ctx.issuedAt,
     title: DOC_TITLE[type],
     exporter: {
       legalName: ctx.tenant.legalName,
       address: ctx.tenant.registeredAddress,
       iecNumber: ctx.tenant.iecNumber,
       gstin: ctx.tenant.gstin,
+      adCode: ctx.tenant.adCode,
+    },
+    // The account is held in the exporter's own legal name — a mismatch is a payment-rejection cause,
+    // so it is derived here rather than stored as a separately-editable field that could drift.
+    bank: {
+      bankName: ctx.tenant.bankName,
+      accountName: ctx.tenant.legalName,
+      accountNumber: ctx.tenant.bankAccountNumber,
+      ifscOrSwift: ctx.tenant.bankIfscOrSwift,
+      adCode: ctx.tenant.adCode,
     },
     buyer: { name: ctx.buyer.name, address: ctx.buyer.address, country: ctx.buyer.country },
     incoterm: ctx.shipment.incoterm,
@@ -108,7 +137,7 @@ function invoiceBody(ctx: DocContext): InvoiceBody {
     lineTotal: round2(l.quantity * l.unitPrice),
   }));
   const total = round2(lines.reduce((sum, l) => sum + l.lineTotal, 0));
-  return { lines, total };
+  return { lines, total, totalInWords: amountInWords(total, ctx.currency) };
 }
 
 function packingBody(ctx: DocContext): PackingBody {

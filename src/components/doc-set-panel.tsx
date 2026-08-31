@@ -193,7 +193,15 @@ export function DocSetPanel({
                       {f.severity}
                     </span>
                     <span className="text-ink">
-                      {f.source === 'ai' && <Sparkles className="mr-1 inline h-3 w-3 text-brand" />}
+                      {f.source === 'ai' ? (
+                        <span className="mr-1.5 inline-flex items-center gap-1 rounded bg-brand/10 px-1.5 py-0.5 align-middle text-[10px] font-medium uppercase tracking-wide text-brand">
+                          <Sparkles className="h-3 w-3" aria-hidden /> AI check
+                        </span>
+                      ) : (
+                        <span className="mr-1.5 inline-flex rounded bg-surface px-1.5 py-0.5 align-middle text-[10px] font-medium uppercase tracking-wide text-muted">
+                          Rule
+                        </span>
+                      )}
                       {f.message}
                       {f.suggestion && <span className="block text-xs text-muted">Suggestion: {f.suggestion}</span>}
                     </span>

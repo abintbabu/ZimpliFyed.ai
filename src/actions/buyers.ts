@@ -6,6 +6,7 @@ import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { draftBuyerFollowup } from '@/lib/ai/buyer-followup';
+import { enqueueAction } from '@/lib/action-queue';
 import type { ActivityKind } from '@prisma/client';
 
 export async function listBuyers(tenantId: string) {
@@ -256,6 +257,21 @@ export async function draftBuyerFollowupAction(buyerId: string) {
   ].join('\n');
 
   const { draft, interactionId } = await draftBuyerFollowup(context, tenantId, session.userId);
+
+  // Surface the drafted follow-up in the cross-department Action Queue (SELL) so it lands in the one
+  // approve/edit/reject inbox. dedupeKey keeps repeated "draft" taps from piling up while one is pending.
+  await enqueueAction({
+    tenantId,
+    kind: 'send_followup',
+    department: 'SELL',
+    title: `Follow up with ${buyer.name}`,
+    summary: draft.subject,
+    payload: { subject: draft.subject, body: draft.body },
+    linkedType: 'buyer',
+    linkedId: buyer.id,
+    dedupeKey: `send_followup:buyer:${buyer.id}`,
+    aiInteractionId: interactionId,
+  });
 
   return { ...draft, interactionId };
 }

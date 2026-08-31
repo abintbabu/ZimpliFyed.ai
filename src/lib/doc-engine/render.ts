@@ -1,13 +1,14 @@
-import type { DocModel, DocHeader, InvoiceLine, PackingLine } from './models';
+import type { DocModel, DocHeader, BankDetails, InvoiceLine, PackingLine } from './models';
 
 /**
  * Render layer (DOC_ENGINE_SPEC §1.2). A pure `DocModel → print-ready HTML string` — the document, on an
  * A4 page, ready for the browser's "Save as PDF". No React, no external fonts, no network: the string is
  * self-contained so it works in a new tab, an email attachment pipeline, or the buyer share page.
  *
- * Production note: the spec names `@react-pdf/renderer` for server-side PDF bytes. This HTML renderer is the
- * dependency-free interim — identical layout, swap-in-place when the PDF service lands (the DocModel contract
- * it reads does not change). Kept framework-agnostic on purpose.
+ * The spec's `@react-pdf/renderer` byte renderer now lives alongside this one in `pdf.tsx`. Both read the
+ * same DocModel and print the same blocks; this one stays because it needs no fonts, no bytes and no
+ * server runtime — it is what serves browser print, email previews and the buyer share page. Keep the two
+ * in step: a block added there should appear here too.
  */
 
 function esc(s: string): string {
@@ -18,17 +19,25 @@ function money(n: number, currency: string): string {
   return `${esc(currency)} ${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** `2026-08-31` → `31 August 2026`, matching the PDF renderer's long form. */
+function fmtDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
 function headerBlock(h: DocHeader): string {
   return `
     <div class="doc-head">
       <div class="exporter">
         <div class="strong">${esc(h.exporter.legalName)}</div>
         <div>${esc(h.exporter.address)}</div>
-        <div class="muted">IEC: ${esc(h.exporter.iecNumber)} · GSTIN: ${esc(h.exporter.gstin)}</div>
+        <div class="muted">IEC: ${esc(h.exporter.iecNumber)} · GSTIN: ${esc(h.exporter.gstin)} · AD Code: ${esc(h.exporter.adCode)}</div>
       </div>
       <div class="doc-meta">
         <div class="title">${esc(h.title)}</div>
         <div class="num">${esc(h.docNumber)}</div>
+        <div class="muted">Dated ${esc(fmtDate(h.issuedAt))}</div>
       </div>
     </div>
     <div class="parties">
@@ -41,7 +50,25 @@ function headerBlock(h: DocHeader): string {
     </div>`;
 }
 
-function invoiceTable(lines: InvoiceLine[], total: number, currency: string): string {
+/** Remittance block. Invoice-type documents only — a buyer pays against these, not against a PL or COO. */
+function bankBlock(b: BankDetails): string {
+  const rows: [string, string][] = [
+    ['Bank Name', b.bankName],
+    ['Account Name', b.accountName],
+    ['Account Number', b.accountNumber],
+    ['IFSC / SWIFT', b.ifscOrSwift],
+    ['AD Code', b.adCode],
+  ];
+  return `
+    <div class="bank">
+      <div class="lbl">Banking details for payment</div>
+      <table class="kv">
+        <tbody>${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td class="strong">${esc(v)}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+function invoiceTable(lines: InvoiceLine[], total: number, totalInWords: string, currency: string): string {
   const rows = lines
     .map(
       (l, i) => `<tr>
@@ -59,7 +86,8 @@ function invoiceTable(lines: InvoiceLine[], total: number, currency: string): st
       <thead><tr><th>#</th><th>Description</th><th>HS Code</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Amount</th></tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr><td colspan="5" class="num strong">Total</td><td class="num strong">${money(total, currency)}</td></tr></tfoot>
-    </table>`;
+    </table>
+    <div class="words"><span class="lbl">Amount in words</span><span class="strong">${esc(currency)} ${esc(totalInWords)}</span></div>`;
 }
 
 function packingTable(lines: PackingLine[], totalQty: number): string {
@@ -85,7 +113,7 @@ function body(model: DocModel): string {
   switch (model.type) {
     case 'proforma_invoice':
     case 'commercial_invoice':
-      return invoiceTable(model.body.lines, model.body.total, model.currency);
+      return invoiceTable(model.body.lines, model.body.total, model.body.totalInWords, model.currency) + bankBlock(model.bank);
     case 'packing_list':
       return packingTable(model.body.lines, model.body.totalQuantity);
     case 'certificate_of_origin':
@@ -116,6 +144,11 @@ const STYLES = `
   td.mono { font-family: ui-monospace, monospace; }
   tfoot td { border-top: 2px solid #14212e; border-bottom: none; }
   .declaration { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e3e8ec; }
+  .words { margin-top: 8px; padding: 8px 10px; border: 1px solid #e3e8ec; }
+  .bank { margin-top: 20px; }
+  .bank .lbl { display: block; margin-bottom: 6px; }
+  table.kv { width: 60%; }
+  table.kv th { width: 40%; font-weight: 400; }
   @page { size: A4; margin: 0; }
 `;
 

@@ -44,6 +44,12 @@ export const DocContextSchema = z.object({
   buyer: BuyerSchema,
   shipment: ShipmentSchema,
   currency: nonEmpty,
+  /**
+   * Issue date stamped on every document in the set, `YYYY-MM-DD`. It lives on the snapshot rather than
+   * being read from the clock inside a builder: DocModel builders must be pure for the golden harness to
+   * pin them, and a regenerated set legitimately carries a new date because it is a new version.
+   */
+  issuedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Issue date must be YYYY-MM-DD'),
   lines: z.array(LineItemSchema).min(1),
 });
 
@@ -134,6 +140,7 @@ export async function buildDocContext(tenantId: string, orderId: string): Promis
       destination: order.destination ?? '',
     },
     currency: order.quote?.currency ?? '',
+    issuedAt: new Date().toISOString().slice(0, 10),
     lines: (order.quote?.lines ?? []).map((l) => ({
       description: l.description ?? '',
       quantity: l.quantity,

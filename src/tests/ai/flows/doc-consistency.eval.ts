@@ -29,6 +29,8 @@ function baseContext(): DocContext {
     buyer: { name: 'Meridian Home GmbH', country: 'Germany', address: 'Hafenstrasse 4, 20359 Hamburg' },
     shipment: { incoterm: 'FOB', originPort: 'INMAA', destPort: 'DEHAM', destination: 'Germany' },
     currency: 'USD',
+    // Fixed date: an eval fixture that drifts with the calendar is not reproducible.
+    issuedAt: '2026-08-31',
     lines: [
       { description: 'Cotton bath towels 500 GSM', quantity: 2000, unitPrice: 3.5, hsCode: '63026000' },
       { description: 'Cotton hand towels 400 GSM', quantity: 1500, unitPrice: 1.8, hsCode: '63029100' },

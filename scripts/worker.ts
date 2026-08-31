@@ -1,5 +1,6 @@
 import { claim, complete, fail, newWorkerId } from '../src/lib/jobs/queue';
 import { getHandler } from '../src/lib/jobs/handlers';
+import { reportError } from '../src/lib/observability';
 
 /**
  * Job worker loop (DEV_PLAN_100 Sprint 1).
@@ -40,6 +41,7 @@ async function tick(): Promise<'busy' | 'idle'> {
     log('job.completed', { jobId: job.id, kind: job.kind, ms: Date.now() - startedAt });
   } catch (err) {
     await fail(job, err);
+    await reportError(err, { source: 'worker', jobId: job.id, kind: job.kind, tenantId: job.tenantId, attempt: job.attempts });
     log('job.failed', {
       jobId: job.id,
       kind: job.kind,
@@ -59,6 +61,7 @@ async function main() {
       result = await tick();
     } catch (err) {
       // A claim() / DB error — don't hot-loop; back off and try again.
+      await reportError(err, { source: 'worker', phase: 'tick' });
       log('worker.tick_error', { error: err instanceof Error ? err.message : String(err) });
       result = 'idle';
     }

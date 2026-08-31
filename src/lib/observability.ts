@@ -5,6 +5,11 @@
  * no-op unless SENTRY_DSN is configured, and it loads the Sentry SDK dynamically so the dependency is
  * optional — the app builds and runs without it. To turn it on: `npm i @sentry/node` (server) /
  * `@sentry/nextjs`, set SENTRY_DSN, and this lights up. No call sites change.
+ *
+ * Setup (ROADMAP §7 item 7 — @sentry/node is now installed):
+ *   - Required env: SENTRY_DSN (project DSN from sentry.io). Without it, reportError only console.errors.
+ *   - No other config needed; environment is tagged from NODE_ENV, traces sampled at 10%.
+ *   - "Alerting" = errors reach the Sentry project (default email alerts to the owner); no dashboard here.
  */
 
 type Sink = { captureException: (err: unknown, hint?: Record<string, unknown>) => void };

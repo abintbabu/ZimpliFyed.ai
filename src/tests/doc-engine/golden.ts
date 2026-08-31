@@ -30,6 +30,8 @@ function baseContext(): DocContext {
     buyer: { name: 'Meridian Home GmbH', country: 'Germany', address: 'Hafenstrasse 4, 20359 Hamburg' },
     shipment: { incoterm: 'FOB', originPort: 'INMAA', destPort: 'DEHAM', destination: 'Germany' },
     currency: 'USD',
+    // Fixed, never `new Date()` — a golden fixture that changes with the calendar pins nothing.
+    issuedAt: '2026-08-31',
     lines: [
       { description: 'Cotton bath towels 500 GSM', quantity: 2000, unitPrice: 3.5, hsCode: '63026000' },
       { description: 'Cotton hand towels 400 GSM', quantity: 1500, unitPrice: 1.8, hsCode: '63029100' },
@@ -132,6 +134,70 @@ function fixtures(): Fixture[] {
   return out;
 }
 
+/**
+ * Field-level assertions on the built models, alongside the rule fixtures above.
+ *
+ * The rule pass only sees what rules.ts looks at, so a field could silently stop being carried into the
+ * DocModel — and therefore off the printed document — without a single rule fixture failing. These pin the
+ * blocks a customs officer and a paying buyer actually read: the remittance details, the issue date, and
+ * the amount in words.
+ */
+function modelAssertions(): { name: string; ok: boolean; detail: string }[] {
+  const ctx = baseContext();
+  const set = buildSet(ctx, ALL);
+  const ci = set.find((d) => d.type === 'commercial_invoice')!;
+  const pl = set.find((d) => d.type === 'packing_list')!;
+  const out: { name: string; ok: boolean; detail: string }[] = [];
+
+  const check = (name: string, ok: boolean, detail = '') => out.push({ name, ok, detail });
+
+  // Bank details reach every document. DocContext has always required them; before the PDF renderer
+  // landed nothing carried them into the model, so a proforma printed with no way to pay it.
+  for (const d of set) {
+    check(`bank/${d.type}/account`, d.bank.accountNumber === ctx.tenant.bankAccountNumber, `got "${d.bank.accountNumber}"`);
+    check(`bank/${d.type}/ifsc`, d.bank.ifscOrSwift === ctx.tenant.bankIfscOrSwift, `got "${d.bank.ifscOrSwift}"`);
+    // The account must be in the exporter's own legal name — a mismatch gets the remittance rejected.
+    check(`bank/${d.type}/account-name-matches-exporter`, d.bank.accountName === d.exporter.legalName, `got "${d.bank.accountName}"`);
+    check(`identity/${d.type}/ad-code`, d.exporter.adCode === ctx.tenant.adCode, `got "${d.exporter.adCode}"`);
+    check(`date/${d.type}/issuedAt`, d.issuedAt === ctx.issuedAt, `got "${d.issuedAt}"`);
+  }
+
+  // Amount in words must agree with the figure it sits beside.
+  if (ci.type === 'commercial_invoice') {
+    check('words/total', ci.body.total === 9700, `expected 9700, got ${ci.body.total}`);
+    check(
+      'words/text',
+      ci.body.totalInWords === 'Nine Thousand Seven Hundred Only',
+      `got "${ci.body.totalInWords}"`,
+    );
+  }
+
+  // A fractional total must name its subunits, and use the currency's own subunit label.
+  const frac = buildSet({ ...ctx, lines: [{ ...ctx.lines[0], quantity: 1, unitPrice: 1234.5 }] }, ['commercial_invoice'])[0];
+  if (frac.type === 'commercial_invoice') {
+    check(
+      'words/fractional',
+      frac.body.totalInWords === 'One Thousand Two Hundred Thirty Four and Fifty Cents Only',
+      `got "${frac.body.totalInWords}"`,
+    );
+  }
+  const inr = buildSet({ ...ctx, currency: 'INR', lines: [{ ...ctx.lines[0], quantity: 1, unitPrice: 100.25 }] }, ['commercial_invoice'])[0];
+  if (inr.type === 'commercial_invoice') {
+    check('words/inr-paise', inr.body.totalInWords === 'One Hundred and Twenty Five Paise Only', `got "${inr.body.totalInWords}"`);
+  }
+  // Indian grouping, not millions — this is what the bank and customs read.
+  const lakh = buildSet({ ...ctx, lines: [{ ...ctx.lines[0], quantity: 1, unitPrice: 2_500_000 }] }, ['commercial_invoice'])[0];
+  if (lakh.type === 'commercial_invoice') {
+    check('words/lakh-crore-grouping', lakh.body.totalInWords === 'Twenty Five Lakh Only', `got "${lakh.body.totalInWords}"`);
+  }
+
+  // A packing list carries no prices — leaking unit prices onto the document that travels with the cargo
+  // is exactly the disclosure exporters ask us to prevent.
+  check('packing/no-price-fields', pl.type === 'packing_list' && !JSON.stringify(pl.body).includes('unitPrice'));
+
+  return out;
+}
+
 function run() {
   const all = fixtures();
   let passed = 0;
@@ -148,11 +214,21 @@ function run() {
     }
   }
 
+  const assertions = modelAssertions();
+  for (const a of assertions) {
+    if (a.ok) passed++;
+    else failures.push(`  ✗ ${a.name}${a.detail ? `\n      ${a.detail}` : ''}`);
+  }
+
+  const total = all.length + assertions.length;
   if (failures.length) {
-    console.error(`✗ doc-engine golden: ${passed}/${all.length} passed\n${failures.join('\n')}`);
+    console.error(`✗ doc-engine golden: ${passed}/${total} passed\n${failures.join('\n')}`);
     process.exit(1);
   }
-  console.log(`✓ doc-engine golden: ${all.length} fixtures pass (every rule has a violating + a clean fixture)`);
+  console.log(
+    `✓ doc-engine golden: ${all.length} rule fixtures + ${assertions.length} model assertions pass ` +
+      `(every rule has a violating + a clean fixture)`,
+  );
 }
 
 run();

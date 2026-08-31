@@ -115,12 +115,14 @@ model Tenant {
   aiInteractions     AiInteraction[]
   meterEvents        MeterEvent[]
   domainEvents       DomainEvent[]
+  actionQueueItems   ActionQueueItem[]
   buyers             Buyer[]
   activities         Activity[]
   products           Product[]
   priceLists         PriceList[]
   jobs               Job[]
   integrationCredentials IntegrationCredential[]
+  consentRecords         ConsentRecord[]
   expenses           Expense[]
   featureFlags       FeatureFlag[]
   invoiceTemplates   InvoiceTemplate[]
@@ -1455,6 +1457,72 @@ model DomainEvent {
   @@index([tenantId, type, createdAt])
 }
 
+/// Cross-department Action Queue (CPO_PRODUCT_PLAN §3.10, v2 keystone): one inbox of every AI-proposed
+/// action across departments, each with approve/edit/reject. This is the UI of "the founder runs everything
+/// with minimal human intervention" — the day is the queue + the brief. Producers call enqueueAction();
+/// nothing here executes an external effect until a human approves (the L1 gate, PRODUCT_PLAN §6).
+model ActionQueueItem {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
+
+  kind    ActionKind
+  status  ActionQueueStatus @default(pending)
+  /// SELL / MONEY / SHIP / COMPLY — used to group the queue by department.
+  department String
+
+  title   String
+  summary String
+
+  /// The AI's proposed effect (e.g. { subject, body } for a follow-up), editable before approval.
+  payload Json?
+  /// 0..1 model confidence when the producer has one; drives review ordering.
+  confidence Float?
+
+  /// Links back to the underlying artifact so approve can resolve it, and dedupe can find duplicates.
+  linkedType  String?
+  linkedId    String?
+  /// Idempotency key so re-running a producer (cron retry) doesn't enqueue the same action twice
+  /// while it is still pending.
+  dedupeKey   String?
+
+  /// The runAi draft this action approves, if any — approving consumes it through the single-shot gate.
+  aiInteractionId String?
+
+  decidedByUserId String?
+  decidedAt       DateTime?
+  snoozedUntil    DateTime?
+  /// Set on approval: did the human edit the AI's proposed payload before approving? This is the
+  /// L-promotion currency (CPO_PRODUCT_PLAN §4) — approve-without-edit rate per kind gates autonomy.
+  editedOnApprove Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, dedupeKey])
+}
+
+enum ActionKind {
+  send_followup
+  review_expense
+  renew_compliance
+  dunning_nudge
+  send_quote
+  chase_vendor
+  delay_alert
+  send_whatsapp_template
+}
+
+enum ActionQueueStatus {
+  pending
+  approved
+  rejected
+  snoozed
+  done
+}
+
 model KnowledgeChunk {
   id       String @id @default(cuid())
   packId   String
@@ -1648,6 +1716,47 @@ model IntegrationCredential {
 
   @@unique([tenantId, kind, account])
   @@index([tenantId])
+}
+
+/**
+ * Outbound-send consent record (DPDP residency decision, 2026-07-12 [CTO]: "consent-record model must ship
+ * with unified-inbox v1"; ROADMAP.md §7 item 4, blocks outbound send GA). Keyed by channel + identifier
+ * (not buyerId) so a send can be gated before any Buyer/lead record exists — the WhatsApp/email send path
+ * checks this, not the CRM. One row per (tenant, channel, identifier); granting/revoking updates it in place
+ * so history isn't needed here — the audit log already records who changed it and when.
+ */
+model ConsentRecord {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
+
+  channel    ConsentChannel
+  /** The phone number (E.164) or email address consent was recorded for. */
+  identifier String
+
+  status ConsentStatus @default(granted)
+  /** Where consent was captured: "buyer_reply" | "signup_form" | "manual" | "whatsapp_opt_in" etc. */
+  source String
+
+  grantedAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, channel, identifier])
+  @@index([tenantId, status])
+}
+
+enum ConsentChannel {
+  whatsapp
+  email
+}
+
+enum ConsentStatus {
+  granted
+  revoked
 }
 
 // ─── Billing (BILLING_SPEC) ────────────────────────────────────────────────

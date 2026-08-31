@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyWebhookSignature } from '@/lib/billing/razorpay-client';
 import { reduceRazorpayEvent } from '@/lib/billing/razorpay-reducer';
+import { reportError } from '@/lib/observability';
 
 /** Razorpay webhook endpoint (BILLING_SPEC §2; DEV_PLAN_100 Sprint 1). Signature-verified (HMAC-SHA256 of
  * the raw body), idempotent via WebhookEvent — a replayed delivery short-circuits before the reducer runs.
@@ -26,6 +27,13 @@ export async function POST(req: Request) {
   }
 
   const event = JSON.parse(body);
-  await reduceRazorpayEvent(event);
+  try {
+    await reduceRazorpayEvent(event);
+  } catch (err) {
+    // Reducer failed after the event was recorded — surface to Sentry and 500 so Razorpay retries.
+    await reportError(err, { source: 'webhook.razorpay', eventId, eventType: event?.event });
+    if (eventId) await prisma.webhookEvent.deleteMany({ where: { provider: 'razorpay', eventId } });
+    return NextResponse.json({ error: 'Processing failed' }, { status: 500 });
+  }
   return NextResponse.json({ received: true });
 }

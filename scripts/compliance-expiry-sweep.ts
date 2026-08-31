@@ -1,5 +1,6 @@
 import { prisma } from '../src/lib/prisma';
 import { writeDomainEvent } from '../src/lib/domain-events';
+import { enqueueAction } from '../src/lib/action-queue';
 import { complianceStatus, alertWindowStart } from '../src/lib/compliance-deadlines';
 
 /**
@@ -33,6 +34,22 @@ async function sweepComplianceExpiry() {
 
     const windowStart = alertWindowStart(expiresAt, item.renewalLeadDays);
     if (item.lastAlertedAt && item.lastAlertedAt >= windowStart) continue; // already alerted for this window
+
+    // Surface a renewal action in the cross-department Action Queue (COMPLY). dedupeKey carries the window
+    // start so a renewal (expiresAt pushed out → new window) re-enqueues, but re-runs inside one window don't.
+    await enqueueAction({
+      tenantId: item.tenantId,
+      kind: 'renew_compliance',
+      department: 'COMPLY',
+      title: `Renew ${item.name}`,
+      summary:
+        status === 'expired'
+          ? `${item.name} expired on ${expiresAt.toISOString().slice(0, 10)}. Renew it to keep the doc engine unblocked.`
+          : `${item.name} expires on ${expiresAt.toISOString().slice(0, 10)} (within ${item.renewalLeadDays}d). Start the renewal now.`,
+      linkedType: 'compliance_item',
+      linkedId: item.id,
+      dedupeKey: `renew_compliance:${item.id}:${windowStart.toISOString()}`,
+    });
 
     await prisma.$transaction(async (tx) => {
       await writeDomainEvent(tx, {

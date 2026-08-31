@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { stripe } from '@/lib/billing/stripe-client';
 import { reduceStripeEvent } from '@/lib/billing/stripe-reducer';
+import { reportError } from '@/lib/observability';
 
 /** Stripe webhook endpoint (BILLING_SPEC §2). Signature-verified, idempotent via WebhookEvent — a replayed
  * event ID short-circuits before the reducer runs, so retries and duplicate deliveries are safe. */
@@ -27,6 +28,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true, deduped: true });
   }
 
-  await reduceStripeEvent(event);
+  try {
+    await reduceStripeEvent(event);
+  } catch (err) {
+    // Reducer failed after the event was recorded — surface to Sentry and 500 so Stripe retries.
+    await reportError(err, { source: 'webhook.stripe', eventId: event.id, eventType: event.type });
+    await prisma.webhookEvent.deleteMany({ where: { provider: 'stripe', eventId: event.id } });
+    return NextResponse.json({ error: 'Processing failed' }, { status: 500 });
+  }
   return NextResponse.json({ received: true });
 }

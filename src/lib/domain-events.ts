@@ -21,10 +21,15 @@ export type DomainEventType =
   | 'billing.dunning_nudge'
   | 'data_export.requested'
   | 'compliance.expiry_alert'
+  | 'shipment.delay_alert'
   | 'expense.auto_posted'
   | 'expense.needs_review'
   | 'inbox.message_received'
-  | 'inbox.message_triaged';
+  | 'inbox.message_triaged'
+  | 'action.enqueued'
+  | 'action.approved'
+  | 'action.rejected'
+  | 'whatsapp.template_sent';
 
 /** Minimal event log for key mutations (AI_PLATFORM_SPEC §6). Consumers — onboarding checklist, health score,
  * future webhooks/agents — poll this table; no queue infra until the TEAMS_AND_ORG_PLAN §9 checkpoint. */

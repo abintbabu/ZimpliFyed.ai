@@ -7,6 +7,7 @@ export const DASHBOARD_NAV_ITEMS: AppNavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard', exact: true },
   { label: 'Daily brief', href: '/dashboard/brief', icon: 'Sunrise' },
   { label: 'Inbox', href: '/dashboard/inbox', icon: 'Inbox', permission: 'inbox:read' },
+  { label: 'Action queue', href: '/dashboard/action-queue', icon: 'ListChecks', permission: 'action_queue:read' },
   { label: 'Cash flow', href: '/dashboard/cash-flow', icon: 'PiggyBank', permission: 'analytics:read' },
   { label: 'Copilot', href: '/dashboard/copilot', icon: 'Sparkles', permission: 'analytics:read' },
   { label: 'Leads', href: '/dashboard/leads', icon: 'Users2', permission: 'leads:read' },

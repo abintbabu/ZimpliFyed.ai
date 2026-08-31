@@ -4,6 +4,7 @@ import { runAi, type AiImage } from '@/ai/router';
 import { prisma } from '@/lib/prisma';
 import { getObject } from '@/lib/storage';
 import { writeDomainEvent } from '@/lib/domain-events';
+import { enqueueAction } from '@/lib/action-queue';
 
 /**
  * Expense pipeline (DEV_PLAN_100 Sprint 4): image/PDF/UPI screenshot → vision extract → GST-head +
@@ -110,4 +111,25 @@ export async function runExpensePipeline(expenseId: string, tenantId: string): P
     refId: expense.id,
     payload: { amount: extraction.amount, confidence: extraction.confidence, orderId: expense.orderId },
   });
+
+  // A low-confidence expense surfaces in the cross-department Action Queue (MONEY) so the founder
+  // clears it from the one inbox. dedupeKey on the expense id keeps a job retry idempotent.
+  if (!autoPost) {
+    const amountLabel =
+      extraction.amount != null ? `${extraction.currency ?? ''} ${extraction.amount}`.trim() : 'unknown amount';
+    await enqueueAction({
+      tenantId,
+      kind: 'review_expense',
+      department: 'MONEY',
+      title: `Review expense — ${extraction.vendorName ?? 'unknown vendor'} (${amountLabel})`,
+      summary: `AI classified this as ${extraction.gstHead ?? 'an uncategorised head'} at ${Math.round(
+        extraction.confidence * 100,
+      )}% confidence — below the auto-post bar. Confirm the GST head and order attribution.`,
+      confidence: extraction.confidence,
+      linkedType: 'expense',
+      linkedId: expense.id,
+      dedupeKey: `review_expense:${expense.id}`,
+      aiInteractionId: interactionId,
+    });
+  }
 }

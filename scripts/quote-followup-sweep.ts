@@ -1,5 +1,6 @@
 import { prisma } from '../src/lib/prisma';
 import { writeDomainEvent } from '../src/lib/domain-events';
+import { enqueueAction } from '../src/lib/action-queue';
 import { draftBuyerFollowup } from '../src/lib/ai/buyer-followup';
 
 /**
@@ -68,12 +69,28 @@ async function sweepQuoteFollowups() {
     ].join('\n');
 
     let draft: { subject: string; body: string };
+    let interactionId: string;
     try {
-      ({ draft } = await draftBuyerFollowup(context, event.tenantId, assignee.userId));
+      ({ draft, interactionId } = await draftBuyerFollowup(context, event.tenantId, assignee.userId));
     } catch (err) {
       console.error(`[followup] ${quote.quoteNumber}: draft failed — ${err instanceof Error ? err.message : String(err)}`);
       continue;
     }
+
+    // Route the drafted nudge into the cross-department Action Queue (SELL) so it lands in the one
+    // approve/edit/reject inbox; the AiInteraction is consumed through the single-shot gate on approval.
+    await enqueueAction({
+      tenantId: event.tenantId,
+      kind: 'send_followup',
+      department: 'SELL',
+      title: `Follow up on ${quote.quoteNumber} — ${quote.buyer?.name ?? 'buyer'}`,
+      summary: draft.subject,
+      payload: { subject: draft.subject, body: draft.body },
+      linkedType: 'quote',
+      linkedId: quoteId,
+      dedupeKey: `send_followup:quote:${quoteId}`,
+      aiInteractionId: interactionId,
+    });
 
     await prisma.$transaction(async (tx) => {
       await tx.task.create({

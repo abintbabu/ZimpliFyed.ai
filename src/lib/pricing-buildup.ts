@@ -50,7 +50,9 @@ type CostedLine = {
  * invoice is saved/sent - any line missing either is filled with the fallback
  * default here (rather than left blank) and its price recomputed.
  */
-export function withDefaultExpenseMargin<T extends CostedLine>(items: T[]): T[] {
+export function withDefaultExpenseMargin<T extends CostedLine>(
+  items: T[],
+): (T & { expensePct?: number; marginPct?: number })[] {
   return items.map(li => {
     if (li.cost == null || li.cost <= 0) return li;
     if (li.expensePct != null && li.marginPct != null) return li;

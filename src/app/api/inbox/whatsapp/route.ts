@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { enqueue } from '@/lib/jobs/queue';
+import { reportError } from '@/lib/observability';
 
 /**
  * WhatsApp Business (Meta Cloud API) inbound webhook (INBOX_SPEC; CTO integrations posture — WhatsApp via Meta
@@ -51,6 +52,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
+  try {
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
       const value = change.value;
@@ -97,6 +99,11 @@ export async function POST(req: Request) {
         }
       }
     }
+  }
+  } catch (err) {
+    // Persist/enqueue failure — surface to Sentry and 500 so Meta redelivers (upsert makes replays safe).
+    await reportError(err, { source: 'webhook.whatsapp' });
+    return NextResponse.json({ error: 'Processing failed' }, { status: 500 });
   }
 
   // Always 200 so Meta does not retry a delivery we have already accepted.
