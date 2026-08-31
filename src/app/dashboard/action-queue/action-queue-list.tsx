@@ -60,6 +60,7 @@ function ActionCard({ item, canApprove }: { item: ActionItem; canApprove: boolea
           <div className="mb-1 flex items-center gap-2">
             <Badge tone={DEPT_TONE[item.department] ?? 'neutral'}>{item.department}</Badge>
             {item.payload?.channel === 'whatsapp' && <Badge tone="success">WhatsApp</Badge>}
+            {item.payload?.channel === 'gmail_reply' && <Badge tone="brand">Gmail reply</Badge>}
             {item.confidence != null && (
               <span className="text-xs text-muted">{Math.round(item.confidence * 100)}% confidence</span>
             )}

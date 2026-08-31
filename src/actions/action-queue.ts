@@ -8,6 +8,8 @@ import { writeAudit } from '@/lib/audit';
 import { writeDomainEvent } from '@/lib/domain-events';
 import { approveAiInteraction } from '@/ai/approval';
 import { sendWhatsAppTemplate, parseWhatsAppSendPayload, WhatsAppSendError } from '@/lib/whatsapp/send';
+import { sendGmailReply, parseGmailReplyPayload, GmailSendError } from '@/lib/inbox/gmail-send';
+import { isFeatureEnabled } from '@/lib/feature-flags';
 import type { Prisma } from '@prisma/client';
 
 /**
@@ -82,6 +84,36 @@ export async function approveAction(itemId: string, editedPayload?: Prisma.Input
           ? `Cannot send: no WhatsApp consent on record for ${waSend.to}. Record consent first, then approve again.`
           : `WhatsApp send failed (${reason}). The action is still pending — fix the issue and approve again.`,
       );
+    }
+  }
+
+  // Gmail reply-in-thread (ROADMAP §7 item 5): same approve-is-send pattern as WhatsApp above, additionally
+  // gated on the per-tenant CASA-review feature flag — a flow can be built and reviewed before its CASA
+  // scopes are approved, but it can never actually send until the flag is flipped on for that tenant.
+  const gmailReply = parseGmailReplyPayload(effectivePayload);
+  if (gmailReply) {
+    if (!(await isFeatureEnabled(tenantId, 'gmail_reply'))) {
+      throw new Error('Gmail reply-in-thread is not enabled for this workspace yet');
+    }
+    try {
+      const { messageId } = await sendGmailReply({ tenantId, ...gmailReply });
+      await writeDomainEvent(prisma, {
+        tenantId,
+        type: 'action.approved',
+        refId: item.id,
+        payload: { kind: item.kind, edited: editedPayload !== undefined, gmailMessageId: messageId },
+      });
+    } catch (err) {
+      const reason = err instanceof GmailSendError ? err.code : 'unknown_error';
+      const detail = err instanceof Error ? err.message : String(err);
+      await writeAudit({
+        session,
+        collection: 'action_queue',
+        documentId: item.id,
+        action: 'update',
+        summary: `Gmail reply blocked (${reason}): ${item.title} — ${detail}`,
+      });
+      throw new Error(`Gmail reply failed (${reason}). The action is still pending — fix the issue and approve again.`);
     }
   }
 

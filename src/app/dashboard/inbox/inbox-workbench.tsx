@@ -12,6 +12,7 @@ import {
   setMessageStatus,
   triageToLead,
   syncChannel,
+  draftInboxReplyAction,
   type InboxMessageView,
 } from '@/actions/inbox';
 
@@ -209,6 +210,7 @@ export function InboxWorkbench({
               onTriage={() => run(() => triageToLead(selected.id))}
               onClassify={() => run(() => classifyNow(selected.id))}
               onStatus={(status) => run(() => setMessageStatus(selected.id, status))}
+              onDraftReply={() => run(() => draftInboxReplyAction(selected.id))}
             />
           ) : (
             <div className="rounded-2xl border border-line p-8 text-center text-sm text-muted">
@@ -228,6 +230,7 @@ function MessageDetail({
   onTriage,
   onClassify,
   onStatus,
+  onDraftReply,
 }: {
   message: InboxMessageView;
   canWrite: boolean;
@@ -235,6 +238,7 @@ function MessageDetail({
   onTriage: () => void;
   onClassify: () => void;
   onStatus: (status: InboxMessageStatus) => void;
+  onDraftReply: () => void;
 }) {
   return (
     <div className="rounded-2xl border border-line bg-canvas p-4 dark:bg-surface">
@@ -285,6 +289,16 @@ function MessageDetail({
               className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink disabled:opacity-50"
             >
               Classify now
+            </button>
+          )}
+          {message.channelKind === 'gmail' && (
+            <button
+              onClick={onDraftReply}
+              disabled={pending}
+              title="Drafts an AI reply and queues it for approval — nothing sends until you approve it"
+              className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink disabled:opacity-50"
+            >
+              <Sparkles className="h-4 w-4" /> Draft reply
             </button>
           )}
           {message.status !== 'archived' && (

@@ -11,6 +11,9 @@ import { storeCredential } from '@/lib/crypto/vault';
 import { syncChannelCore } from '@/lib/inbox/sync';
 import { runInboxIngest } from '@/lib/inbox/ingest';
 import { draftQuoteFromEnquiry } from '@/actions/enquiry';
+import { draftInboxReply } from '@/lib/ai/inbox-reply';
+import { enqueueAction } from '@/lib/action-queue';
+import { isFeatureEnabled } from '@/lib/feature-flags';
 
 const INBOX_PATH = '/dashboard/inbox';
 
@@ -237,6 +240,64 @@ export async function triageToLead(messageId: string) {
 
   revalidatePath(INBOX_PATH);
   return draft;
+}
+
+/**
+ * Draft an AI reply to an inbound Gmail message and put it in the Action Queue for approval (ROADMAP §7
+ * item 5). Gmail-only for now (CTO cut) and flag-gated per tenant — CASA review is a prerequisite for
+ * outbound Gmail send. The draft never sends on its own; approving the queue item is the send trigger
+ * (CPO 2026-08-31: reply-in-thread only, no free-compose surface).
+ */
+export async function draftInboxReplyAction(messageId: string) {
+  const session = await requireTenantSession();
+  const { tenantId, userId } = session;
+  if (!hasPermission(session.role, 'inbox:write')) throw new Error('You do not have permission to manage the inbox');
+
+  if (!(await isFeatureEnabled(tenantId, 'gmail_reply'))) {
+    throw new Error('Gmail reply-in-thread is not enabled for this workspace yet');
+  }
+
+  const message = await prisma.inboxMessage.findFirst({
+    where: { id: messageId, tenantId },
+    include: { channel: { select: { kind: true, account: true } } },
+  });
+  if (!message) throw new Error('Unknown message');
+  if (message.channel.kind !== 'gmail') throw new Error('Reply-in-thread is only available for Gmail messages');
+  if (!message.externalMessageId || !message.fromAddress) {
+    throw new Error('This message is missing the Gmail id or sender address needed to reply');
+  }
+
+  const context = [
+    `From: ${message.fromName ?? message.fromAddress} <${message.fromAddress}>`,
+    message.subject ? `Subject: ${message.subject}` : null,
+    '',
+    message.body,
+  ]
+    .filter((line) => line !== null)
+    .join('\n');
+
+  const { draft, interactionId } = await draftInboxReply(context, tenantId, userId);
+
+  const actionId = await enqueueAction({
+    tenantId,
+    kind: 'reply_inbox_message',
+    department: 'SELL',
+    title: `Reply: ${message.subject ?? message.fromAddress}`,
+    summary: draft.body.slice(0, 160),
+    payload: {
+      channel: 'gmail_reply',
+      account: message.channel.account,
+      originalExternalMessageId: message.externalMessageId,
+      fromAddress: message.fromAddress,
+      body: draft.body,
+    },
+    linkedType: 'inbox_message',
+    linkedId: message.id,
+    aiInteractionId: interactionId,
+    dedupeKey: `reply_inbox_message:${message.id}`,
+  });
+
+  return { actionId, ...draft };
 }
 
 /**

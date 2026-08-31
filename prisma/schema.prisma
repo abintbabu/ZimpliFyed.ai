@@ -1513,6 +1513,7 @@ enum ActionKind {
   chase_vendor
   delay_alert
   send_whatsapp_template
+  reply_inbox_message
 }
 
 enum ActionQueueStatus {

@@ -14,7 +14,8 @@ export type FeatureFlagKey =
   | 'copilot_v2'
   | 'doc_engine_v1'
   | 'inbox_sync'
-  | 'whatsapp_notifications';
+  | 'whatsapp_notifications'
+  | 'gmail_reply';
 
 export const FEATURE_FLAGS: Record<FeatureFlagKey, { label: string; description: string; default: boolean }> = {
   copilot_v2: {
@@ -35,6 +36,11 @@ export const FEATURE_FLAGS: Record<FeatureFlagKey, { label: string; description:
   whatsapp_notifications: {
     label: 'WhatsApp notifications',
     description: 'Outbound WhatsApp alerts for orders and shipments.',
+    default: false,
+  },
+  gmail_reply: {
+    label: 'Gmail reply-in-thread',
+    description: 'AI-drafted, human-approved replies sent in-thread on inbound Gmail messages (CASA-gated).',
     default: false,
   },
 };
