@@ -70,6 +70,36 @@ function encodeBase64Url(input: string): string {
   return Buffer.from(input, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/** Prefix a subject with "Re: " unless it already carries one (case-insensitive, per RFC 5322 §3.6.5). */
+export function replySubject(originalSubject: string): string {
+  return originalSubject.toLowerCase().startsWith('re:') ? originalSubject : `Re: ${originalSubject}`;
+}
+
+/**
+ * Build the RFC 2822 message for a reply-in-thread. Kept pure (no network, no vault) so the threading
+ * headers — the part Gmail silently ignores when malformed, quietly breaking the conversation view — are
+ * unit-testable. In-Reply-To/References are omitted entirely when the original carried no Message-ID,
+ * rather than emitted empty, which would break threading in strict clients.
+ */
+export function buildReplyMime(args: {
+  to: string;
+  originalSubject: string;
+  originalMessageIdHeader?: string;
+  body: string;
+}): string {
+  const lines = [
+    `To: ${args.to}`,
+    `Subject: ${replySubject(args.originalSubject)}`,
+    ...(args.originalMessageIdHeader
+      ? [`In-Reply-To: ${args.originalMessageIdHeader}`, `References: ${args.originalMessageIdHeader}`]
+      : []),
+    'Content-Type: text/plain; charset="UTF-8"',
+    '',
+    args.body,
+  ];
+  return lines.join('\r\n');
+}
+
 export interface SendGmailReplyInput {
   tenantId: string;
   /** IntegrationCredential sub-account (a specific mailbox); empty = tenant default. */
@@ -94,19 +124,14 @@ export async function sendGmailReply(input: SendGmailReplyInput): Promise<{ mess
     throw new GmailSendError('original_not_found', `Original message not found on Gmail (${origRes.status})`);
   }
   const original = (await origRes.json()) as GmailOriginal;
-  const messageIdHeader = header(original.payload?.headers, 'Message-ID');
-  const origSubject = header(original.payload?.headers, 'Subject') ?? '';
-  const replySubject = origSubject.toLowerCase().startsWith('re:') ? origSubject : `Re: ${origSubject}`;
-
-  const lines = [
-    `To: ${input.fromAddress}`,
-    `Subject: ${replySubject}`,
-    ...(messageIdHeader ? [`In-Reply-To: ${messageIdHeader}`, `References: ${messageIdHeader}`] : []),
-    'Content-Type: text/plain; charset="UTF-8"',
-    '',
-    input.body,
-  ];
-  const raw822 = encodeBase64Url(lines.join('\r\n'));
+  const raw822 = encodeBase64Url(
+    buildReplyMime({
+      to: input.fromAddress,
+      originalSubject: header(original.payload?.headers, 'Subject') ?? '',
+      originalMessageIdHeader: header(original.payload?.headers, 'Message-ID'),
+      body: input.body,
+    }),
+  );
 
   const res = await fetch(`${GMAIL_BASE}/messages/send`, {
     method: 'POST',

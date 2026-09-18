@@ -97,11 +97,14 @@ export async function approveAction(itemId: string, editedPayload?: Prisma.Input
     }
     try {
       const { messageId } = await sendGmailReply({ tenantId, ...gmailReply });
+      // Mirrors the WhatsApp branch above: record the SEND as its own event type. Using 'action.approved'
+      // here emitted it twice for one approval (this branch plus the shared one below), double-counting the
+      // action in every consumer that polls DomainEvent.
       await writeDomainEvent(prisma, {
         tenantId,
-        type: 'action.approved',
+        type: 'gmail.reply_sent',
         refId: item.id,
-        payload: { kind: item.kind, edited: editedPayload !== undefined, gmailMessageId: messageId },
+        payload: { to: gmailReply.fromAddress, gmailMessageId: messageId },
       });
     } catch (err) {
       const reason = err instanceof GmailSendError ? err.code : 'unknown_error';

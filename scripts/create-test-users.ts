@@ -2,9 +2,9 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 const users = [
-  { name: "Jerome Cherian", email: "jerome@zimplifyed.ai", password: "Jerome#Export2026", role: "admin" as const },
-  { name: "Raijo Philip", email: "raijo@zimplifyed.ai", password: "Raijo#Export2026", role: "admin" as const },
-  { name: "Arun George", email: "arun@zimplifyed.ai", password: "Arun#Export2026", role: "admin" as const },
+  { name: "Jerome Cherian", email: "jerome@zimplifyed.ai", password: "Jerome#Export2026", role: "super_admin" as const },
+  { name: "Raijo Philip", email: "raijo@zimplifyed.ai", password: "Raijo#Export2026", role: "super_admin" as const },
+  { name: "Arun George", email: "arun@zimplifyed.ai", password: "Arun#Export2026", role: "super_admin" as const },
   { name: "Abin Babu", email: "abin@zimplifyed.ai", password: "Abin#Export2026", role: "super_admin" as const },
 ];
 

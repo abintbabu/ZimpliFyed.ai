@@ -1,7 +1,7 @@
 import 'server-only';
 import { getCredential } from '@/lib/crypto/vault';
-import type { FetchArgs, FetchResult, InboxProvider, NormalizedMessage } from './provider';
-import { ProviderNotConfiguredError } from './provider';
+import type { FetchArgs, FetchResult, InboxProvider, NormalizedMessage } from './types';
+import { ProviderNotConfiguredError } from './types';
 
 /**
  * Gmail live connector (INBOX_SPEC; CTO integrations posture — Gmail via CASA-reviewed OAuth, never IMAP
@@ -189,3 +189,11 @@ export const gmailProvider: InboxProvider = {
     return { messages, cursor: profile.historyId };
   },
 };
+
+/**
+ * Internal parsers exposed for unit tests (`npm run test:inbox`). These are the pure, fiddly parts of the
+ * connector — RFC 5322 From parsing, base64url decoding, and the MIME body walk — where a regression is
+ * silent (a lead ingested with a null sender or an empty body) rather than loud. Not part of the public
+ * provider API; production code must go through `gmailProvider`.
+ */
+export const __gmailInternals = { parseFrom, decodeBase64Url, extractBody, parseCredential };

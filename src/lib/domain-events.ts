@@ -29,7 +29,8 @@ export type DomainEventType =
   | 'action.enqueued'
   | 'action.approved'
   | 'action.rejected'
-  | 'whatsapp.template_sent';
+  | 'whatsapp.template_sent'
+  | 'gmail.reply_sent';
 
 /** Minimal event log for key mutations (AI_PLATFORM_SPEC §6). Consumers — onboarding checklist, health score,
  * future webhooks/agents — poll this table; no queue infra until the TEAMS_AND_ORG_PLAN §9 checkpoint. */

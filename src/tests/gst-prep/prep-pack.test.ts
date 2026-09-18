@@ -70,4 +70,4 @@ function exp(over: Partial<PrepExpense>): PrepExpense {
   assert.throws(() => periodBounds('nope'));
 }
 
-console.log('gst-prep prep-pack: all assertions passed');
+console.log('✓ gst-prep prep-pack: all assertions passed');

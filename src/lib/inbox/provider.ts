@@ -1,6 +1,12 @@
 import 'server-only';
 import type { InboxChannelKind } from '@prisma/client';
+import { ProviderNotConfiguredError } from './types';
+import type { InboxProvider } from './types';
 import { gmailProvider } from './gmail';
+
+// The contract lives in ./types (no connector imports) to keep registry→connector→contract acyclic;
+// re-exported here so existing `from '@/lib/inbox/provider'` imports keep working.
+export * from './types';
 
 /**
  * Inbox provider adapter (Stage 2 — INBOX_SPEC).
@@ -14,46 +20,6 @@ import { gmailProvider } from './gmail';
  * The credentialed providers are declared with the same shape and throw a typed "not configured" error
  * until their SDK + IntegrationCredential wiring lands; callers already handle that path.
  */
-
-/** A normalized inbound item as a provider hands it back, before it becomes an InboxMessage row. */
-export type NormalizedMessage = {
-  externalMessageId: string;
-  fromName?: string | null;
-  fromAddress?: string | null;
-  subject?: string | null;
-  body: string;
-  receivedAt: Date;
-};
-
-export type FetchArgs = {
-  tenantId: string;
-  /** The channel's IntegrationCredential discriminator (empty string = tenant default). */
-  account: string;
-  /** Provider watermark from the last sync (Gmail historyId / IMAP UID / ISO timestamp); null on first run. */
-  cursor: string | null;
-};
-
-export type FetchResult = {
-  messages: NormalizedMessage[];
-  /** New watermark to persist on the channel for the next incremental pull. */
-  cursor: string | null;
-};
-
-export interface InboxProvider {
-  readonly kind: InboxChannelKind;
-  /** Whether this provider can pull on its own. `manual` returns false — it is fed externally. */
-  readonly canPull: boolean;
-  /** Incrementally fetch messages newer than `cursor`. Must be idempotent w.r.t. externalMessageId. */
-  fetch(args: FetchArgs): Promise<FetchResult>;
-}
-
-/** Raised by credentialed providers that have no working connector yet. Callers surface it as a channel error. */
-export class ProviderNotConfiguredError extends Error {
-  constructor(kind: InboxChannelKind) {
-    super(`Inbox provider "${kind}" is not connected yet — add its credential to enable live sync.`);
-    this.name = 'ProviderNotConfiguredError';
-  }
-}
 
 /** The manual/pasted-in channel: never pulls; messages are created directly via the ingest action. */
 const manualProvider: InboxProvider = {

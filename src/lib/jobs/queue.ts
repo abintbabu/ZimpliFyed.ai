@@ -75,17 +75,24 @@ export type ClaimedJob = {
  * Uses SKIP LOCKED so many workers can poll the same table without contending. */
 export async function claim(workerId: string): Promise<ClaimedJob | null> {
   const leaseCutoff = new Date(Date.now() - LEASE_MS);
+  // `runAfter`/`lockedAt` are `timestamp WITHOUT time zone` (Prisma's default mapping) and Prisma writes
+  // UTC instants into them. Bare `now()` is a `timestamptz`, which Postgres coerces to the SERVER's local
+  // wall clock for that comparison — so on any server not set to UTC the two disagree by the offset. That
+  // silently broke both halves of the claim: backoffs shorter than the offset were ignored (failing jobs
+  // hot-looped through every attempt) and expired leases were never reclaimed (a crashed worker's jobs
+  // stranded as `active` forever). Pin every timestamp in this statement to UTC so it matches what Prisma
+  // stores. Covered by src/tests/integration/platform.test.ts §7-8.
   const rows = await prisma.$queryRaw<
     Array<{ id: string; tenantId: string; kind: string; payload: unknown; attempts: number; maxAttempts: number }>
   >`
     UPDATE "Job" SET
       status = 'active',
-      "lockedAt" = now(),
+      "lockedAt" = (now() AT TIME ZONE 'UTC'),
       "lockedBy" = ${workerId},
       attempts = attempts + 1
     WHERE id = (
       SELECT id FROM "Job"
-      WHERE "runAfter" <= now()
+      WHERE "runAfter" <= (now() AT TIME ZONE 'UTC')
         AND (
           status = 'queued'
           OR (status = 'active' AND "lockedAt" < ${leaseCutoff})
@@ -119,7 +126,7 @@ export async function complete(jobId: string): Promise<void> {
 export async function fail(job: ClaimedJob, error: unknown): Promise<void> {
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   const exhausted = job.attempts >= job.maxAttempts;
-  const backoffSec = Math.min(3600, 2 ** job.attempts * 5); // 10s, 20s, 40s … capped at 1h
+  const backoffSec = nextBackoffSeconds(job.attempts);
   await prisma.job.update({
     where: { id: job.id },
     data: exhausted
@@ -132,6 +139,15 @@ export async function fail(job: ClaimedJob, error: unknown): Promise<void> {
           runAfter: new Date(Date.now() + backoffSec * 1000),
         },
   });
+}
+
+/**
+ * Exponential retry backoff for attempt N (1-based, i.e. the attempt that just failed): 10s, 20s, 40s,
+ * 80s … capped at 1h. Pure so the schedule is unit-testable — a regression here either hammers a failing
+ * third-party API or parks a retry hours away, and neither is visible from the job table alone.
+ */
+export function nextBackoffSeconds(attempts: number): number {
+  return Math.min(3600, 2 ** attempts * 5);
 }
 
 export function newWorkerId(): string {
