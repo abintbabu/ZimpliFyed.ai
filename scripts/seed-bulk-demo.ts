@@ -58,7 +58,7 @@ async function main() {
     leadNumber: nextLeadNumber + i,
     nextFollowUpAt: daysFromNow((i % 10) + 1),
   }));
-  await prisma.lead.createMany({ data: leadRows });
+  await prisma.lead.createMany({ data: leadRows }); // tenant-safe: every row in leadRows carries tenantId (built above)
   console.log(`✓ ${leadRows.length} leads`);
 
   // ── 8 buyers ──────────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ async function main() {
     paymentTermsDefault: pick(['30% advance / 70% on BL', 'LC at sight', 'Net 30'], i),
     creditLimit: 10000 + i * 2500,
   }));
-  await prisma.buyer.createMany({ data: buyerRows });
+  await prisma.buyer.createMany({ data: buyerRows }); // tenant-safe: every row in buyerRows carries tenantId (built above)
   const buyers = await prisma.buyer.findMany({ where: { tenantId, isDemo: true }, orderBy: { createdAt: 'desc' }, take: 8 });
   console.log(`✓ ${buyerRows.length} buyers`);
 
@@ -119,7 +119,7 @@ async function main() {
     uom: 'pcs',
     category: pick(['Bath', 'Bed', 'Kitchen', 'Spa'], i),
   }));
-  await prisma.product.createMany({ data: productRows });
+  await prisma.product.createMany({ data: productRows }); // tenant-safe: every row in productRows carries tenantId (built above)
   console.log(`✓ ${productRows.length} products`);
 
   // ── 8 quotes (with lines) ────────────────────────────────────────────────
@@ -213,7 +213,7 @@ async function main() {
     assigneeUserId: 'demo', assigneeName: 'You', assigneeRole: pick(taskRoles, i),
     linkedType: pick(taskLinkedTypes, i), dueDate: daysFromNow((i % 14) + 1), createdByUserId: 'demo',
   }));
-  await prisma.task.createMany({ data: taskRows });
+  await prisma.task.createMany({ data: taskRows }); // tenant-safe: every row in taskRows carries tenantId (built above)
   console.log(`✓ ${taskRows.length} tasks`);
 
   const total = leadRows.length + buyerRows.length + vendors.length + rateCount + productRows.length

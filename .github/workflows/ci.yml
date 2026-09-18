@@ -21,6 +21,10 @@ jobs:
       - run: npx prisma generate
       - name: Tenant-isolation + crypto security scan
         run: npm run test:security
+      - name: Host classification table
+        run: npm run test:host
+      - name: Pack registry (country + industry)
+        run: npm run test:packs
       - name: Doc-engine golden rules (exact-match)
         run: npm run test:doc-engine
       - name: Lint

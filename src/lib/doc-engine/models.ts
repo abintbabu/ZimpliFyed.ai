@@ -90,7 +90,23 @@ export type DocHeader = {
   currency: string;
 };
 
-export type InvoiceBody = { lines: InvoiceLine[]; total: number; totalInWords: string };
+/** Jurisdiction-specific statutory content a CountryPack can supply (§12/Wave 1) — see
+ * src/packs/types.ts CountryPack.resolveDocumentExtras. Absent/empty when the active pack doesn't
+ * implement it; models.ts never assumes a value is present. */
+export type DocumentExtras = { endorsement?: string; placeOfSupply?: string };
+
+export type InvoiceBody = {
+  lines: InvoiceLine[];
+  total: number;
+  totalInWords: string;
+  endorsement: string;
+  placeOfSupply: string;
+  /** Plain context passthrough (not pack-computed) so a pack-specific rule in rules.ts — which only
+   * sees DocModel[], never DocContext — has what it needs to check LUT validity without rules.ts
+   * itself gaining a DocContext dependency. */
+  gstExportUnderLut: boolean;
+  lutValidTo?: string;
+};
 export type PackingBody = { lines: PackingLine[]; totalQuantity: number };
 export type OriginBody = { lines: PackingLine[]; countryOfOrigin: string; declaration: string };
 
@@ -128,7 +144,7 @@ function header(ctx: DocContext, type: DocType, docNumber: string): DocHeader {
   };
 }
 
-function invoiceBody(ctx: DocContext): InvoiceBody {
+function invoiceBody(ctx: DocContext, extras: DocumentExtras): InvoiceBody {
   const lines: InvoiceLine[] = ctx.lines.map((l) => ({
     description: l.description,
     hsCode: l.hsCode,
@@ -137,7 +153,15 @@ function invoiceBody(ctx: DocContext): InvoiceBody {
     lineTotal: round2(l.quantity * l.unitPrice),
   }));
   const total = round2(lines.reduce((sum, l) => sum + l.lineTotal, 0));
-  return { lines, total, totalInWords: amountInWords(total, ctx.currency) };
+  return {
+    lines,
+    total,
+    totalInWords: amountInWords(total, ctx.currency),
+    endorsement: extras.endorsement ?? '',
+    placeOfSupply: extras.placeOfSupply ?? '',
+    gstExportUnderLut: ctx.tenant.gstExportUnderLut,
+    lutValidTo: ctx.tenant.lutValidTo,
+  };
 }
 
 function packingBody(ctx: DocContext): PackingBody {
@@ -150,14 +174,16 @@ function packingBody(ctx: DocContext): PackingBody {
   return { lines, totalQuantity };
 }
 
-/** Build one DocModel from context. `docNumber` is assigned by the numbering counter (numbering.ts). */
-export function buildDocModel(type: DocType, ctx: DocContext, docNumber: string): DocModel {
+/** Build one DocModel from context. `docNumber` is assigned by the numbering counter (numbering.ts).
+ * `extras` is pack-computed statutory content (§12/Wave 1) — the caller resolves it via the active
+ * CountryPack's `resolveDocumentExtras`; this function stays pack-neutral and just plumbs it through. */
+export function buildDocModel(type: DocType, ctx: DocContext, docNumber: string, extras: DocumentExtras = {}): DocModel {
   const head = header(ctx, type, docNumber);
   switch (type) {
     case 'proforma_invoice':
-      return { type, ...head, body: invoiceBody(ctx) };
+      return { type, ...head, body: invoiceBody(ctx, extras) };
     case 'commercial_invoice':
-      return { type, ...head, body: invoiceBody(ctx) };
+      return { type, ...head, body: invoiceBody(ctx, extras) };
     case 'packing_list':
       return { type, ...head, body: packingBody(ctx) };
     case 'certificate_of_origin':

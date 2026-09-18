@@ -24,7 +24,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 async function findAssignee(tenantId: string) {
   const membership =
     (await prisma.membership.findFirst({
-      where: { tenantId, role: { in: ['admin', 'super_admin'] } },
+      where: { tenantId, role: { in: ['admin', 'super_admin', 'owner'] } },
       include: { user: true },
       orderBy: { createdAt: 'asc' },
     })) ?? (await prisma.membership.findFirst({ where: { tenantId }, include: { user: true }, orderBy: { createdAt: 'asc' } }));
@@ -34,6 +34,9 @@ async function findAssignee(tenantId: string) {
 
 async function sweepQuoteFollowups() {
   const cutoff = new Date(Date.now() - FOLLOWUP_AFTER_DAYS * DAY_MS);
+  // Nightly sweep across ALL tenants by design — each event's own tenantId scopes its downstream
+  // processing (see the rest of this loop).
+  // tenant-safe: cross-tenant sweep by design
   const sentEvents = await prisma.domainEvent.findMany({
     where: { type: 'quote.sent', createdAt: { lte: cutoff } },
     orderBy: { createdAt: 'asc' },

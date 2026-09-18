@@ -7,6 +7,7 @@ import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { requireFeature } from '@/lib/billing/entitlements';
 import { generateDocSet } from '@/lib/doc-engine/generate';
+import { issueDocSet, cancelExportDocument } from '@/lib/doc-engine/issue';
 import { ALL_DOC_TYPES, type DocModel, type DocType } from '@/lib/doc-engine/models';
 import type { Finding } from '@/lib/doc-engine/rules';
 
@@ -79,10 +80,15 @@ export async function getOrderDocSet(orderId: string): Promise<{
   };
 }
 
-/** Approve a draft doc-set: locks it and stamps status. */
+/**
+ * Approve a draft doc-set: this IS the issue transaction (EXPORT_OS_MASTER_PLAN Wave 1) — a real
+ * document number is allocated for every document in the set, exactly once, here. Delegates to
+ * src/lib/doc-engine/issue.ts's issueDocSet, which also writes the per-document `issue`/`amend_issued`
+ * audit entries; this action only adds the doc-set-level entry summarizing the whole approval.
+ */
 export async function approveDocSetAction(docSetId: string) {
   const session = await requireTenantSession();
-  const { tenantId, role } = session;
+  const { tenantId, role, userId } = session;
   if (!hasPermission(role, 'orders:write')) throw new Error('You do not have permission to approve documents');
 
   const docSet = await prisma.docSet.findFirst({ where: { id: docSetId, tenantId } });
@@ -92,9 +98,36 @@ export async function approveDocSetAction(docSetId: string) {
     throw new Error('Resolve the blocking issues before approving this document set');
   }
 
-  await prisma.docSet.update({ where: { id: docSetId }, data: { status: 'approved', approvedAt: new Date() } }); // tenant-safe: docSetId verified tenant-owned via findFirst above
-  await writeAudit({ session, collection: 'doc_sets', documentId: docSetId, action: 'update', summary: `Approved doc-set v${docSet.version}` });
+  const result = await issueDocSet({ tenantId, docSetId, userId, role });
+  if (!result.ok) throw new Error(result.error);
+
+  await writeAudit({
+    session,
+    collection: 'doc_sets',
+    documentId: docSetId,
+    action: 'update',
+    summary: `Approved doc-set v${docSet.version} (${result.documents.map((d) => d.docNumber).join(', ')})`,
+    after: { documents: result.documents },
+  });
   revalidatePath(`/dashboard/orders/${docSet.orderId}`);
+
+  return { documents: result.documents };
+}
+
+/** Cancels one issued document within a set. The number is retained, never reused — see
+ * cancelExportDocument's own doc comment for why "nil value" isn't a separate stored flag. */
+export async function cancelExportDocumentAction(exportDocumentId: string, reason: string) {
+  const session = await requireTenantSession();
+  const { tenantId, role, userId } = session;
+  if (!hasPermission(role, 'orders:write')) throw new Error('You do not have permission to cancel documents');
+
+  const doc = await prisma.exportDocument.findFirst({ where: { id: exportDocumentId, tenantId } });
+  if (!doc) throw new Error('Document not found');
+
+  const result = await cancelExportDocument({ tenantId, exportDocumentId, userId, role, reason });
+  if (!result.ok) throw new Error(result.error);
+
+  revalidatePath(`/dashboard/orders/${doc.orderId}`);
 }
 
 export async function revokeDocSetShareLink(docSetId: string) {

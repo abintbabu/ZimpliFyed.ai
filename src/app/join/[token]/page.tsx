@@ -17,6 +17,9 @@ export default async function JoinTokenPage({
 }) {
   const { token } = await params;
 
+  // Tokenised entry point (EXPORT_OS_MASTER_PLAN §4.5 pattern) — resolves by the globally-unique
+  // token itself, before any session/tenant context exists.
+  // tenant-safe: token-resolved lookup, pre-tenant-context
   const invite = await prisma.invite.findUnique({
     where: { token },
     include: { tenant: { select: { name: true } } },

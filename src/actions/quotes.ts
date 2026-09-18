@@ -29,7 +29,7 @@ type QuoteLineInput = {
 function enforceMarginFloor(lines: { marginPct?: number; description: string }[], role: string, allowOverride?: boolean) {
   const breach = lines.find((l) => l.marginPct != null && l.marginPct < MARGIN_FLOOR_PCT);
   if (!breach) return;
-  const canOverride = allowOverride && (role === 'admin' || role === 'super_admin');
+  const canOverride = allowOverride && (role === 'admin' || role === 'super_admin' || role === 'owner');
   if (!canOverride) {
     throw new Error(
       `Line "${breach.description}" is priced at ${breach.marginPct}% margin, below the ${MARGIN_FLOOR_PCT}% floor. An admin must override to save this quote.`,

@@ -30,7 +30,7 @@ async function resolveBuyerName(order: {
     if (data.buyerName?.trim()) return { name: data.buyerName.trim(), address: data.buyerAddress?.trim() };
   }
   if (order.quote?.leadId) {
-    const lead = await prisma.lead.findUnique({ where: { id: order.quote.leadId } });
+    const lead = await prisma.lead.findFirst({ where: { id: order.quote.leadId, tenantId: order.tenantId } });
     if (lead?.company?.trim()) return { name: lead.company.trim() };
     if (lead?.name?.trim()) return { name: lead.name.trim() };
   }
@@ -38,6 +38,7 @@ async function resolveBuyerName(order: {
 }
 
 async function main() {
+  // tenant-safe: one-off backfill script — processes every tenant's orders missing a buyer link, by design
   const orders = await prisma.order.findMany({
     where: { buyerId: null },
     include: { quote: true },
@@ -89,9 +90,9 @@ async function main() {
 
     console.log(`  ${dryRun ? '[dry-run] would link' : 'linking'} order ${order.orderNumber} -> buyer "${resolved.name}"`);
     if (!dryRun) {
-      await prisma.order.update({ where: { id: order.id }, data: { buyerId } });
+      await prisma.order.update({ where: { id: order.id, tenantId: order.tenantId }, data: { buyerId } });
       if (order.quote) {
-        await prisma.quote.update({ where: { id: order.quote.id }, data: { buyerId } });
+        await prisma.quote.update({ where: { id: order.quote.id, tenantId: order.tenantId }, data: { buyerId } });
       }
     }
     linked += 1;

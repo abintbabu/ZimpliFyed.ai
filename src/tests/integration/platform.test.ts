@@ -235,7 +235,7 @@ try {
     const second = await claim(newWorkerId());
     assert.ok(second === null || second.id !== first.id, 'a leased job is not handed to a second worker');
 
-    await complete(first.id);
+    await complete(claimed!);
     const done = await prisma.job.findUniqueOrThrow({ where: { id: first.id } });
     assert.equal(done.status, 'completed');
     assert.ok(done.completedAt);
@@ -290,7 +290,7 @@ try {
     const reclaimed = await claim(rescuer);
     assert.equal(reclaimed!.id, id, 'a job whose 5-minute lease expired is picked up by another worker');
     assert.equal(reclaimed!.attempts, 2, 'the reclaim counts as another attempt, so a poison job still parks');
-    await complete(id);
+    await complete(reclaimed!);
   }
 
   // ── 9. DB-backed rate limiter: window, denial, retry-after, key isolation ───

@@ -60,7 +60,9 @@ export async function createOrganization(input: CreateOrgInput): Promise<{ error
     const byIp = await checkRateLimitDb(`orgcreate:ip:${ip}`, 10, 86_400_000);
     if (!byIp.allowed) return { error: 'Daily org-creation limit reached for this network' };
 
-    const owned = await prisma.membership.count({ where: { userId: user.id, role: 'super_admin' } }); // tenant-safe: scoped by userId at org-creation, before any tenant context exists
+    // owner and super_admin are treated identically during the Wave-0 expand step (§6.1) — count both,
+    // since not every existing tenant has been through scripts/backfill-owner-role.ts yet.
+    const owned = await prisma.membership.count({ where: { userId: user.id, role: { in: ['owner', 'super_admin'] } } }); // tenant-safe: scoped by userId at org-creation, before any tenant context exists
     if (owned >= MAX_OWNED_TENANTS) return { error: `You can own at most ${MAX_OWNED_TENANTS} organizations` };
   }
 
@@ -80,7 +82,7 @@ export async function createOrganization(input: CreateOrgInput): Promise<{ error
       primaryMarkets: data.primaryMarkets ?? [],
       teamSizeBand: data.teamSizeBand || null,
       onboarding: {},
-      memberships: { create: { userId: user.id, role: 'super_admin' } },
+      memberships: { create: { userId: user.id, role: 'owner' } },
     },
   });
 
@@ -90,7 +92,7 @@ export async function createOrganization(input: CreateOrgInput): Promise<{ error
     data: {
       tenantId: tenant.id, collection: 'tenants', documentId: tenant.id, action: 'create',
       summary: `Organization "${tenant.name}" created`, actorUserId: user.id,
-      actorEmail: user.email ?? 'unknown', actorRole: 'super_admin',
+      actorEmail: user.email ?? 'unknown', actorRole: 'owner',
     },
   });
 

@@ -64,7 +64,7 @@ export default async function QuotesPage() {
             <NewQuoteForm
               buyers={buyers.map((b) => ({ id: b.id, name: b.name }))}
               products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name }))}
-              canOverrideMarginFloor={role === 'admin' || role === 'super_admin'}
+              canOverrideMarginFloor={role === 'admin' || role === 'super_admin' || role === 'owner'}
             />
           )
         }

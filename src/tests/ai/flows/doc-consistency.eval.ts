@@ -25,6 +25,7 @@ function baseContext(): DocContext {
       bankName: 'HDFC Bank',
       bankAccountNumber: '50200012345678',
       bankIfscOrSwift: 'HDFC0000123',
+      gstExportUnderLut: true,
     },
     buyer: { name: 'Meridian Home GmbH', country: 'Germany', address: 'Hafenstrasse 4, 20359 Hamburg' },
     shipment: { incoterm: 'FOB', originPort: 'INMAA', destPort: 'DEHAM', destination: 'Germany' },

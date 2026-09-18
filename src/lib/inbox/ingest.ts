@@ -22,7 +22,7 @@ export async function runInboxIngest(messageId: string, tenantId: string): Promi
   const { classification, interactionId } = await classifyInboundMessage(rawText, tenantId);
 
   await prisma.inboxMessage.update({
-    where: { id: message.id },
+    where: { id: message.id, tenantId },
     data: {
       category: classification.category,
       summary: classification.summary,

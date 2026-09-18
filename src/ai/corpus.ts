@@ -31,11 +31,12 @@ export async function ingestSource(input: { packId: string; sourceRef: string; t
   const chunks = chunkText(input.text);
   const now = new Date();
 
-  await prisma.$executeRaw`UPDATE "KnowledgeChunk" SET "supersededAt" = ${now} WHERE "sourceRef" = ${input.sourceRef} AND "supersededAt" IS NULL`;
+  await prisma.$executeRaw`UPDATE "KnowledgeChunk" SET "supersededAt" = ${now} WHERE "sourceRef" = ${input.sourceRef} AND "supersededAt" IS NULL`; // tenant-safe: KnowledgeChunk is pack-scoped (packId), not tenant-scoped, until EXPORT_OS_MASTER_PLAN §11.5 Wave 5 adds tenantId+scope
 
   for (const chunk of chunks) {
     const embedding = await embedText(chunk, 'RETRIEVAL_DOCUMENT');
     const vectorLiteral = `[${embedding.join(',')}]`;
+    // tenant-safe: KnowledgeChunk is pack-scoped (packId), not tenant-scoped, until §11.5 Wave 5 adds tenantId+scope
     await prisma.$executeRaw`
       INSERT INTO "KnowledgeChunk" (id, "packId", "sourceRef", title, text, embedding, "effectiveFrom", "createdAt")
       VALUES (gen_random_uuid()::text, ${input.packId}, ${input.sourceRef}, ${input.title}, ${chunk}, ${vectorLiteral}::vector, ${now}, ${now})
@@ -53,6 +54,7 @@ export async function searchKnowledge(packId: string, query: string, limit = 5):
   const embedding = await embedText(query, 'RETRIEVAL_QUERY');
   const vectorLiteral = `[${embedding.join(',')}]`;
 
+  // tenant-safe: KnowledgeChunk is pack-scoped (packId), not tenant-scoped, until §11.5 Wave 5 adds tenantId+scope
   return prisma.$queryRaw<KnowledgeSearchResult[]>`
     SELECT title, "sourceRef", text, 1 - (embedding <=> ${vectorLiteral}::vector) AS similarity
     FROM "KnowledgeChunk"

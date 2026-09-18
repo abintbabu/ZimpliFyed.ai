@@ -82,6 +82,10 @@ export async function claim(workerId: string): Promise<ClaimedJob | null> {
   // hot-looped through every attempt) and expired leases were never reclaimed (a crashed worker's jobs
   // stranded as `active` forever). Pin every timestamp in this statement to UTC so it matches what Prisma
   // stores. Covered by src/tests/integration/platform.test.ts §7-8.
+  // The worker claims the next runnable job across ALL tenants by design — that is the point of a
+  // shared queue. Each returned row's tenantId is then used by the caller to scope its own per-job
+  // work; this claim step itself is a platform-level operation.
+  // tenant-safe: cross-tenant job claim is the intended behavior of a shared worker queue
   const rows = await prisma.$queryRaw<
     Array<{ id: string; tenantId: string; kind: string; payload: unknown; attempts: number; maxAttempts: number }>
   >`
@@ -115,9 +119,9 @@ export async function claim(workerId: string): Promise<ClaimedJob | null> {
   };
 }
 
-export async function complete(jobId: string): Promise<void> {
+export async function complete(job: Pick<ClaimedJob, 'id' | 'tenantId'>): Promise<void> {
   await prisma.job.update({
-    where: { id: jobId },
+    where: { id: job.id, tenantId: job.tenantId },
     data: { status: 'completed', completedAt: new Date(), lockedAt: null, lockedBy: null, lastError: null },
   });
 }
@@ -128,7 +132,7 @@ export async function fail(job: ClaimedJob, error: unknown): Promise<void> {
   const exhausted = job.attempts >= job.maxAttempts;
   const backoffSec = nextBackoffSeconds(job.attempts);
   await prisma.job.update({
-    where: { id: job.id },
+    where: { id: job.id, tenantId: job.tenantId },
     data: exhausted
       ? { status: 'failed', lastError: message.slice(0, 2000), lockedAt: null, lockedBy: null }
       : {

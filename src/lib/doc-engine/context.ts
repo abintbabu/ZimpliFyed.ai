@@ -17,6 +17,11 @@ const TenantIdentitySchema = z.object({
   bankName: nonEmpty,
   bankAccountNumber: nonEmpty,
   bankIfscOrSwift: nonEmpty,
+  // GST export mode (Wave 1) — optional: a tenant paying IGST on exports has no LUT to enter, so
+  // these don't block the fix-list the way the identity/bank fields above do.
+  gstExportUnderLut: z.boolean(),
+  lutNumber: z.string().trim().optional(),
+  lutValidTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'LUT valid-to must be YYYY-MM-DD').optional(),
 });
 
 const BuyerSchema = z.object({
@@ -127,6 +132,9 @@ export async function buildDocContext(tenantId: string, orderId: string): Promis
       bankName: tenant.bankName ?? '',
       bankAccountNumber: tenant.bankAccountNumber ?? '',
       bankIfscOrSwift: tenant.bankIfscOrSwift ?? '',
+      gstExportUnderLut: tenant.gstExportUnderLut,
+      lutNumber: tenant.lutNumber ?? undefined,
+      lutValidTo: tenant.lutValidTo ? tenant.lutValidTo.toISOString().slice(0, 10) : undefined,
     },
     buyer: {
       name: order.buyer?.name ?? '',

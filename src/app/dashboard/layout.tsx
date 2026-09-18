@@ -33,7 +33,7 @@ export default async function DashboardLayout({
       userEmail={session.user.email}
       roleLabel={ROLE_LABELS[membership.role]}
       tenantStatus={tenant.status}
-      isOwner={membership.role === 'admin' || membership.role === 'super_admin'}
+      isOwner={membership.role === 'admin' || membership.role === 'super_admin' || membership.role === 'owner'}
     >
       {children}
     </DashboardShell>

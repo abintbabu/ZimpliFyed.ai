@@ -30,6 +30,9 @@ export async function resolvePostAuthDestination(
 
   // 1. Pending email invites → consume ALL, land in the newest.
   if (email) {
+    // Pre-tenant-context routing — finds this user's pending invites across every tenant that
+    // invited them, by design (that's the point of this function).
+    // tenant-safe: cross-tenant invite lookup by user identity, before any tenant is selected
     const pending = await prisma.invite.findMany({
       where: { email, acceptedAt: null },
       orderBy: { createdAt: 'desc' },
@@ -42,7 +45,7 @@ export async function resolvePostAuthDestination(
           create: { userId: user.id, tenantId: invite.tenantId, role: invite.role },
           update: {},
         }),
-        prisma.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
+        prisma.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }), // tenant-safe: consuming this user's own invite, resolved above by user identity not tenant context
       ]);
       newestTenantId ??= invite.tenantId;
     }
@@ -53,6 +56,7 @@ export async function resolvePostAuthDestination(
   }
 
   // 2. Existing memberships → lastActive if still a member, else most recent.
+  // tenant-safe: pre-tenant-context routing — enumerates every tenant this user belongs to, by design.
   const memberships = await prisma.membership.findMany({
     where: { userId: user.id },
     include: { tenant: { select: { slug: true } } },
@@ -90,6 +94,9 @@ async function consumeLinkInvite(
   userId: string,
   token: string,
 ): Promise<{ tenantId: string; slug: string } | null> {
+  // Tokens are globally unique (like the public-token pattern, §4.5) — resolved by token, not
+  // tenant context, before any tenant is known.
+  // tenant-safe: token-resolved lookup, pre-tenant-context
   const invite = await prisma.invite.findUnique({
     where: { token },
     include: { tenant: { select: { slug: true } } },
@@ -104,7 +111,7 @@ async function consumeLinkInvite(
       create: { userId, tenantId: invite.tenantId, role: invite.role },
       update: {},
     }),
-    prisma.invite.update({ where: { id: invite.id }, data: { useCount: { increment: 1 } } }),
+    prisma.invite.update({ where: { id: invite.id }, data: { useCount: { increment: 1 } } }), // tenant-safe: consuming the invite resolved by token above, before any tenant context exists
   ]);
   return { tenantId: invite.tenantId, slug: invite.tenant.slug };
 }

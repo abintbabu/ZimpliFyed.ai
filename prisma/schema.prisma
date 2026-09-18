@@ -79,6 +79,12 @@ model Tenant {
   bankAccountNumber String?
   bankIfscOrSwift   String?
 
+  // GST export mode (EXPORT_OS_MASTER_PLAN Wave 1 — Rule 46 endorsement / place-of-supply). Defaults
+  // to LUT (most exporters); a tenant paying IGST on exports instead leaves lutNumber/lutValidTo unset.
+  gstExportUnderLut Boolean   @default(true)
+  lutNumber         String?
+  lutValidTo        DateTime?
+
   billingProvider     BillingProvider?
   providerCustomerId  String?          @unique
   providerSubscriptionId String?       @unique
@@ -128,6 +134,15 @@ model Tenant {
   invoiceTemplates   InvoiceTemplate[]
   inboxChannels      InboxChannel[]
   inboxMessages      InboxMessage[]
+
+  // Wave 0 (EXPORT_OS_MASTER_PLAN §7 Migration D, §7 Migration C)
+  settings            TenantSettings?
+  brandAssets         TenantBrandAsset[]
+  termsClauseSets     TermsClauseSet[]
+  facts               TenantFact[]
+  domains             TenantDomain[]
+  supportAccessGrants SupportAccessGrant[]
+  numberingSeries     NumberingSeries[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -203,6 +218,13 @@ enum MembershipRole {
   viewer
   admin
   super_admin
+  /// Tenant owner (EXPORT_OS_MASTER_PLAN §6.1). Expand step of an expand/backfill/contract
+  /// migration: treated identically to super_admin everywhere until scripts/backfill-owner-role.ts
+  /// runs and super_admin is dropped in a later contract step. Do not remove super_admin yet.
+  owner
+  /// Full admin reach minus the expense ledger and P&L (EXPORT_OS_MASTER_PLAN §6.2, ported from
+  /// Anabyn) — the role an operations lead actually needs.
+  ops_admin
   vendor
 }
 
@@ -779,6 +801,13 @@ model ExportDocument {
   docModel  Json?
   findings  Json?
 
+  // EXPORT_OS_MASTER_PLAN Wave 1 — set only on an already-issued (docNumber != null) document.
+  // The number is never reused or cleared; cancelledAt != null is what "nil value" derives from
+  // at filing-pack time (Wave 7), not a separate stored flag.
+  cancelledAt       DateTime?
+  cancelledReason   String?
+  cancelledByUserId String?
+
   createdByUserId String
   createdAt       DateTime @default(now())
 
@@ -815,6 +844,7 @@ model DocSet {
   generatedByUserId String
   meteredAt         DateTime?
   approvedAt        DateTime?
+  approvedByUserId  String?
   createdAt         DateTime  @default(now())
 
   @@unique([orderId, version])
@@ -920,6 +950,10 @@ enum AuditAction {
   mark_unpaid
   role_change
   pricing_change
+  /// EXPORT_OS_MASTER_PLAN Wave 1 — ExportDocument/DocSet issue-transaction lifecycle.
+  issue
+  amend_issued
+  cancel
 }
 
 model AuditEntry {
@@ -1804,6 +1838,10 @@ enum PlatformAuditAction {
   tenant_reactivate
   slug_reclaim
   plan_override
+  domain_reclaim
+  support_access_request
+  support_access_use
+  support_access_revoke
 }
 
 /**
@@ -1831,4 +1869,226 @@ model PlatformAuditEntry {
 
   @@index([tenantId, createdAt])
   @@index([createdAt])
+}
+
+// ─── Tenant configuration (EXPORT_OS_MASTER_PLAN §7 Migration D, §8) — Wave 0 ──
+// Schema only in Wave 0: these models are additive and unused by runtime code until
+// later waves wire them up (settings UI, support-access flow, numbering issue path).
+
+/**
+ * One row per tenant: typed JSON groups for settings that are read together, written
+ * rarely, and evolve weekly (EXPORT_OS_MASTER_PLAN §8.1). Effective settings layer
+ * industry-pack defaults < country-pack defaults < plan entitlement clamp < these
+ * overrides. Validated by Zod at src/lib/tenant-settings/schema.ts (Wave 1). Always
+ * read via a single getTenantSettings(tenantId) path — never query this model elsewhere.
+ */
+model TenantSettings {
+  id       String @id @default(cuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  identity   Json?
+  brand      Json?
+  docs       Json?
+  commercial Json?
+  vocabulary Json?
+  ai         Json?
+  email      Json?
+  locales    Json?
+
+  version         Int     @default(1)
+  updatedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TenantBrandAssetKind {
+  logo
+  logo_dark
+  favicon
+  signature
+  letterhead
+  font
+}
+
+model TenantBrandAsset {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  kind     TenantBrandAssetKind
+  fileKey  String
+  mimeType String
+  meta     Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, kind])
+}
+
+model TermsClauseSet {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  key       String
+  name      String
+  appliesTo String[]
+  isDefault Boolean @default(false)
+
+  clauses TermsClause[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, key])
+}
+
+/** Pure child of TermsClauseSet — no tenantId of its own, inherits scope through its
+ * parent (the QuoteLineItem pattern; keeps the tenant-scope Prisma extension's
+ * nested-write limitation harmless per EXPORT_OS_MASTER_PLAN §5.2/§7). */
+model TermsClause {
+  id    String         @id @default(cuid())
+  setId String
+  set   TermsClauseSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  key       String
+  locale    String
+  sortOrder Int    @default(0)
+  title     String
+  body      String
+
+  @@unique([setId, key, locale])
+}
+
+/** Generalises Anabyn's FIXED_FACT_LINES — grounding facts the AI desk (Wave 5) and
+ * the answer pack cite; also the per-tenant grounding threshold for the AI hard-disable
+ * gate described in EXPORT_OS_MASTER_PLAN §1.2. */
+model TenantFact {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  category  String
+  text      String
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+  sourceRef String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, category])
+}
+
+enum TenantDomainKind {
+  platform_subdomain
+  custom
+}
+
+enum TenantDomainStatus {
+  pending
+  verifying
+  verified
+  active
+  failed
+}
+
+/** Ships in Wave 0 with only platform_subdomain rows (EXPORT_OS_MASTER_PLAN §4.4) so
+ * host resolution is uniform from the start; custom-domain verification (TXT/CNAME,
+ * SSL provisioning) activates in Wave 8 without touching the resolver again. */
+model TenantDomain {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  hostname  String              @unique
+  kind      TenantDomainKind
+  status    TenantDomainStatus  @default(active)
+  isPrimary Boolean             @default(true)
+
+  verifyMethod     String?
+  verifyToken      String?
+  providerDomainId String?
+  sslStatus        String?
+  lastCheckedAt    DateTime?
+  checkAttempts    Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+enum SupportAccessScope {
+  read_only
+  read_write
+}
+
+/** Tier 2 consented support access (EXPORT_OS_MASTER_PLAN §6.3). Schema only in Wave
+ * 0 — the request/approve UI, requireTenantSession() grant-resolution, the deny-list
+ * for billing/org/domains/export/grant permissions under read_write, and the banner
+ * are later-wave work. hard cap: expiresAt <= approvedAt + 72h, enforced in code. */
+model SupportAccessGrant {
+  id                String              @id @default(cuid())
+  tenantId          String
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedByUserId String
+  reason            String
+  scope             SupportAccessScope  @default(read_only)
+  approvedByUserId  String?
+  approvedAt        DateTime?
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  lastUsedAt        DateTime?
+  useCount          Int                 @default(0)
+
+  @@index([tenantId, expiresAt])
+}
+
+enum NumberingFiscalYearMode {
+  calendar
+  india_fy
+  none
+}
+
+/** Migration C (partial) — schema only in Wave 0. Supersedes DocCounter in a later
+ * wave behind a dual-read shim in src/lib/doc-engine/numbering.ts (EXPORT_OS_MASTER_PLAN
+ * §7); DocCounter keeps serving all document issuance unchanged until then. `key` is a
+ * plain String (not an enum) to match the FeatureFlag/DocCounter.series convention of
+ * shipping new document types without a migration. */
+model NumberingSeries {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  key            String
+  prefix         String
+  fiscalYearMode NumberingFiscalYearMode @default(none)
+  padWidth       Int                     @default(4)
+  separator      String                  @default("-")
+  declaredFloor  Int                     @default(0)
+  active         Boolean                 @default(true)
+
+  counters NumberingCounter[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, key])
+}
+
+/** Pure child of NumberingSeries — no tenantId of its own, inherits scope through its
+ * parent, same convention as TermsClause. */
+model NumberingCounter {
+  id       String          @id @default(cuid())
+  seriesId String
+  series   NumberingSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  periodKey String
+  next      Int    @default(1)
+
+  @@unique([seriesId, periodKey])
 }

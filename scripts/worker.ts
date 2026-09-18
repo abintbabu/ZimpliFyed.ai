@@ -37,7 +37,7 @@ async function tick(): Promise<'busy' | 'idle'> {
   const startedAt = Date.now();
   try {
     await handler(job.payload as never, { tenantId: job.tenantId, jobId: job.id, attempts: job.attempts });
-    await complete(job.id);
+    await complete(job);
     log('job.completed', { jobId: job.id, kind: job.kind, ms: Date.now() - startedAt });
   } catch (err) {
     await fail(job, err);

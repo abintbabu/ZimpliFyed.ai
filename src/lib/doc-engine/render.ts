@@ -68,6 +68,17 @@ function bankBlock(b: BankDetails): string {
     </div>`;
 }
 
+/** CGST Rule 46 export endorsement + place of supply (Wave 1), matching pdf.tsx's GstEndorsement —
+ * absent (empty string) when the active CountryPack doesn't supply one. */
+function gstEndorsementBlock(endorsement: string, placeOfSupply: string): string {
+  if (!endorsement && !placeOfSupply) return '';
+  return `
+    <div class="gst-endorsement">
+      ${endorsement ? `<div class="strong">${esc(endorsement)}</div>` : ''}
+      ${placeOfSupply ? `<div class="muted">Place of Supply: ${esc(placeOfSupply)}</div>` : ''}
+    </div>`;
+}
+
 function invoiceTable(lines: InvoiceLine[], total: number, totalInWords: string, currency: string): string {
   const rows = lines
     .map(
@@ -113,7 +124,11 @@ function body(model: DocModel): string {
   switch (model.type) {
     case 'proforma_invoice':
     case 'commercial_invoice':
-      return invoiceTable(model.body.lines, model.body.total, model.body.totalInWords, model.currency) + bankBlock(model.bank);
+      return (
+        gstEndorsementBlock(model.body.endorsement, model.body.placeOfSupply)
+        + invoiceTable(model.body.lines, model.body.total, model.body.totalInWords, model.currency)
+        + bankBlock(model.bank)
+      );
     case 'packing_list':
       return packingTable(model.body.lines, model.body.totalQuantity);
     case 'certificate_of_origin':
@@ -144,6 +159,8 @@ const STYLES = `
   td.mono { font-family: ui-monospace, monospace; }
   tfoot td { border-top: 2px solid #14212e; border-bottom: none; }
   .declaration { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e3e8ec; }
+  .gst-endorsement { margin-top: 10px; padding: 8px 10px; border: 1px solid #1b3a6b; background: #f5f7f8; text-transform: uppercase; letter-spacing: .02em; }
+  .gst-endorsement .muted { display: block; margin-top: 4px; text-transform: none; letter-spacing: normal; }
   .words { margin-top: 8px; padding: 8px 10px; border: 1px solid #e3e8ec; }
   .bank { margin-top: 20px; }
   .bank .lbl { display: block; margin-bottom: 6px; }

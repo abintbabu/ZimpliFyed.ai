@@ -1,6 +1,8 @@
 import type { DocContext } from '../../lib/doc-engine/context';
 import { buildDocModel, type DocModel, type DocType } from '../../lib/doc-engine/models';
 import { runRules } from '../../lib/doc-engine/rules';
+import { getPack } from '../../packs/registry';
+import { LUT_ENDORSEMENT, IGST_PAID_ENDORSEMENT } from '../../packs/in/gst';
 
 /**
  * Golden-file harness for the deterministic doc-engine (DOC_ENGINE_SPEC §4).
@@ -26,6 +28,10 @@ function baseContext(): DocContext {
       bankName: 'HDFC Bank',
       bankAccountNumber: '50200012345678',
       bankIfscOrSwift: 'HDFC0000123',
+      // Under a valid, unexpired LUT (relative to issuedAt below) — a "fully valid" fixture.
+      gstExportUnderLut: true,
+      lutNumber: 'AD270125001234',
+      lutValidTo: '2027-03-31',
     },
     buyer: { name: 'Meridian Home GmbH', country: 'Germany', address: 'Hafenstrasse 4, 20359 Hamburg' },
     shipment: { incoterm: 'FOB', originPort: 'INMAA', destPort: 'DEHAM', destination: 'Germany' },
@@ -40,7 +46,10 @@ function baseContext(): DocContext {
 }
 
 function buildSet(ctx: DocContext, types: DocType[]): DocModel[] {
-  return types.map((t, i) => buildDocModel(t, ctx, `${t.slice(0, 2).toUpperCase()}-2026-${String(i + 1).padStart(4, '0')}`));
+  // Real pack extras, same call generate.ts makes — golden fixtures pin what actually ships, not a
+  // stubbed-out version of it.
+  const extras = getPack('in').resolveDocumentExtras?.(ctx) ?? {};
+  return types.map((t, i) => buildDocModel(t, ctx, `${t.slice(0, 2).toUpperCase()}-2026-${String(i + 1).padStart(4, '0')}`, extras));
 }
 
 const ALL: DocType[] = ['proforma_invoice', 'commercial_invoice', 'packing_list', 'certificate_of_origin'];
@@ -114,6 +123,18 @@ function fixtures(): Fixture[] {
   out.push({ name: 'break/iec-non-numeric', models: buildSet({ ...baseContext(), tenant: { ...baseContext().tenant, iecNumber: '01234ABCDE' } }, ALL), expect: ['in_iec_format'] });
   out.push({ name: 'break/hs-code-too-short', models: buildSet({ ...baseContext(), lines: [{ ...baseContext().lines[0], hsCode: '6302' }, baseContext().lines[1]] }, ALL), expect: ['in_hs_code_8_digit'] });
   out.push({ name: 'break/gstin-format', models: buildSet({ ...baseContext(), tenant: { ...baseContext().tenant, gstin: 'BADGSTIN123' } }, ALL), expect: ['in_gstin_format'] });
+  out.push({
+    name: 'break/lut-expired',
+    models: buildSet({ ...baseContext(), tenant: { ...baseContext().tenant, lutValidTo: '2026-01-01' } }, ALL), // before issuedAt 2026-08-31
+    expect: ['in_lut_validity'],
+  });
+  out.push({
+    name: 'clean/igst-paid-no-lut-check',
+    // Not under LUT at all — lutValidTo being in the past must not fire, since the endorsement/check
+    // only applies when a tenant actually claims the LUT relief.
+    models: buildSet({ ...baseContext(), tenant: { ...baseContext().tenant, gstExportUnderLut: false, lutValidTo: '2020-01-01' } }, ALL),
+    expect: [],
+  });
 
   // ── Combined violations (order + multiplicity) ────────────────────────────
   {
@@ -194,6 +215,16 @@ function modelAssertions(): { name: string; ok: boolean; detail: string }[] {
   // A packing list carries no prices — leaking unit prices onto the document that travels with the cargo
   // is exactly the disclosure exporters ask us to prevent.
   check('packing/no-price-fields', pl.type === 'packing_list' && !JSON.stringify(pl.body).includes('unitPrice'));
+
+  // Rule 46 endorsement + place of supply (Wave 1) — verbatim, case-sensitive statutory text.
+  if (ci.type === 'commercial_invoice') {
+    check('gst/endorsement-under-lut', ci.body.endorsement === LUT_ENDORSEMENT, `got "${ci.body.endorsement}"`);
+    check('gst/place-of-supply', ci.body.placeOfSupply === '96-Other Country (Germany)', `got "${ci.body.placeOfSupply}"`);
+  }
+  const igstPaid = buildSet({ ...ctx, tenant: { ...ctx.tenant, gstExportUnderLut: false } }, ['commercial_invoice'])[0];
+  if (igstPaid.type === 'commercial_invoice') {
+    check('gst/endorsement-igst-paid', igstPaid.body.endorsement === IGST_PAID_ENDORSEMENT, `got "${igstPaid.body.endorsement}"`);
+  }
 
   return out;
 }

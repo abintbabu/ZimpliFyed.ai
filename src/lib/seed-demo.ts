@@ -133,14 +133,16 @@ export async function seedDemoData(tenantId: string, businessType: BusinessType,
 
 /** Deletes every demo-flagged row for a tenant. Order matters only where FKs lack cascade; isDemo cascades handle children. */
 export async function clearDemoData(tenantId: string) {
+  // Every deleteMany below shares this `w` filter object, which carries tenantId — the scanner's
+  // text heuristic can't see through the variable indirection, hence the per-line annotations.
   const w = { tenantId, isDemo: true };
   await prisma.$transaction([
-    prisma.invoice.deleteMany({ where: w }),
-    prisma.costSheet.deleteMany({ where: w }),
-    prisma.quote.deleteMany({ where: w }),
-    prisma.order.deleteMany({ where: w }),
-    prisma.task.deleteMany({ where: w }),
-    prisma.vendor.deleteMany({ where: w }),
-    prisma.lead.deleteMany({ where: w }),
+    prisma.invoice.deleteMany({ where: w }), // tenant-safe: where: w includes tenantId (defined above)
+    prisma.costSheet.deleteMany({ where: w }), // tenant-safe: where: w includes tenantId (defined above)
+    prisma.quote.deleteMany({ where: w }), // tenant-safe: where: w includes tenantId (defined above)
+    prisma.order.deleteMany({ where: w }), // tenant-safe: where: w includes tenantId (defined above)
+    prisma.task.deleteMany({ where: w }), // tenant-safe: where: w includes tenantId (defined above)
+    prisma.vendor.deleteMany({ where: w }), // tenant-safe: where: w includes tenantId (defined above)
+    prisma.lead.deleteMany({ where: w }), // tenant-safe: where: w includes tenantId (defined above)
   ]);
 }

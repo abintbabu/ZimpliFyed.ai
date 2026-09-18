@@ -81,7 +81,10 @@ export function DocSetPanel({
           approvedAt: null,
           createdAt: new Date(),
           findings: result.findings as Finding[],
-          documents: result.models.map((m) => ({ id: m.docNumber, type: m.type, docNumber: m.docNumber })),
+          // `id: m.type` — a fresh draft's documents all share the same 'DRAFT' placeholder docNumber
+          // (EXPORT_OS_MASTER_PLAN Wave 1: numbers are allocated at approval, not at generation), so
+          // docNumber is no longer unique per document within a set. Type is (one row per type per set).
+          documents: result.models.map((m) => ({ id: m.type, type: m.type, docNumber: m.docNumber })),
         });
       } catch (err) {
         if (!tryOpenFromError(err)) setError(err instanceof Error ? err.message : 'Failed to generate documents');
@@ -94,8 +97,16 @@ export function DocSetPanel({
     setError(null);
     startTransition(async () => {
       try {
-        await approveDocSetAction(docSet.id);
-        refresh({ ...docSet, status: 'approved', approvedAt: new Date() });
+        const { documents: issued } = await approveDocSetAction(docSet.id);
+        // Merge the just-allocated real numbers (EXPORT_OS_MASTER_PLAN Wave 1: numbering happens at
+        // approval, not generation) into the still-'DRAFT'-placeholder rows shown so far.
+        const byType = new Map(issued.map((d) => [d.type, d.docNumber]));
+        refresh({
+          ...docSet,
+          status: 'approved',
+          approvedAt: new Date(),
+          documents: docSet.documents.map((d) => ({ ...d, docNumber: byType.get(d.type) ?? d.docNumber })),
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to approve');
       }

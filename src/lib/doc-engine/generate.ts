@@ -2,26 +2,34 @@ import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { writeDomainEvent } from '@/lib/domain-events';
+import { getPack } from '@/packs/registry';
 import { buildDocContext, type MissingField } from './context';
 import { buildDocModel, type DocModel, type DocType } from './models';
-import { nextDocNumber } from './numbering';
 import { runRules, type Finding } from './rules';
 import { runAiConsistencyPass } from './ai-consistency';
+
+/** Draft documents carry no real serial (EXPORT_OS_MASTER_PLAN Wave 1) — a number is minted exactly
+ * once, at issue (src/lib/doc-engine/issue.ts), never at generation/regeneration time. This
+ * placeholder is what a draft's preview PDF/HTML shows in the number's place. */
+export const DRAFT_DOC_NUMBER_PLACEHOLDER = 'DRAFT';
 
 /**
  * Doc-set generation flow (DOC_ENGINE_SPEC §1.3, build steps 2–3).
  *
  *   1. Build + validate DocContext → fix-list if incomplete (no partial sets).
- *   2. Build every requested DocModel (pure, from the one context snapshot).
+ *   2. Build every requested DocModel (pure, from the one context snapshot), unnumbered.
  *   3. Deterministic rule pass over the whole set.
  *   4. AI consistency pass over the same models (meaning-level findings the rules can't reach).
- *   5. Persist DocSet (version++) + one ExportDocument per type, numbered, findings attached.
+ *   5. Persist DocSet (version++, status 'draft') + one ExportDocument per type, docNumber null,
+ *      findings attached.
  *   6. Meter `doc_set` + emit `docset.generated`.
  *
- * Regeneration after an order edit mints a new version and supersedes the previous set, so history and the
- * field-level diff are preserved. The DB-touching steps (persist/meter/event) run in one transaction — a
- * half-written set can never exist, and numbering stays collision-free. The AI pass (a network call) runs
- * AFTER that transaction commits, so a DB connection is never held open across inference, then its findings
+ * This is always a DRAFT — regeneration after an order edit mints a new version and supersedes the
+ * previous set, freely, any number of times, without ever allocating a real serial (EXPORT_OS_MASTER_PLAN
+ * Wave 1). A number is minted exactly once, in issue order, when a human calls issueDocSet (issue.ts) —
+ * see that file for why numbering must never happen here. The DB-touching steps (persist/meter/event)
+ * run in one transaction — a half-written set can never exist. The AI pass (a network call) runs AFTER
+ * that transaction commits, so a DB connection is never held open across inference, then its findings
  * are written back; if inference fails the set still stands on its deterministic guarantees.
  */
 
@@ -62,12 +70,13 @@ export async function generateDocSet(input: {
       await tx.docSet.update({ where: { id: prior.id }, data: { status: 'superseded' } });
     }
 
-    // Steps 2–3 — models + rules. Number each document from the tenant counter (tx-safe).
-    const built: { type: DocType; model: DocModel; docNumber: string }[] = [];
-    for (const type of input.types) {
-      const docNumber = await nextDocNumber(tx, tenantId, type);
-      built.push({ type, model: buildDocModel(type, context, docNumber), docNumber });
-    }
+    // Steps 2–3 — models + rules. No number is allocated here (Wave 1) — a draft is a free, cheap
+    // preview; the real serial is minted exactly once, at issue (issue.ts), inside its own transaction.
+    const extras = getPack(packId).resolveDocumentExtras?.(context) ?? {};
+    const built: { type: DocType; model: DocModel }[] = input.types.map((type) => ({
+      type,
+      model: buildDocModel(type, context, DRAFT_DOC_NUMBER_PLACEHOLDER, extras),
+    }));
     const findings = runRules(built.map((b) => b.model), packId);
 
     // Step 5 — persist the set + documents.
@@ -101,7 +110,7 @@ export async function generateDocSet(input: {
           version: docVersion,
           data: b.model as object,
           docSetId: docSet.id,
-          docNumber: b.docNumber,
+          docNumber: null, // allocated at issue (issue.ts), never at draft-generation time
           docModel: b.model as object,
           findings: docFindings as object,
           createdByUserId: userId,

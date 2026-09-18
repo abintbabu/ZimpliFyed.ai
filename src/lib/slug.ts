@@ -2,6 +2,8 @@ export const RESERVED_SLUGS = [
   'app', 'admin', 'www', 'api', 'track', 'signup', 'login', 'dashboard',
   'vendor-portal', 'docs', 'status', 'help', 'welcome', 'join', 'no-access',
   'settings', 'billing', 'onboarding',
+  // Infra/DNS labels reserved by src/lib/tenant-resolver.ts's classifyHost (EXPORT_OS_MASTER_PLAN §4.2).
+  'mail', 'static', 'cdn',
 ] as const;
 
 /** Lowercase, hyphenate, strip to the `^[a-z0-9-]{3,40}$` slug charset. */

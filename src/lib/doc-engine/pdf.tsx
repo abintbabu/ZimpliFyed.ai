@@ -182,6 +182,29 @@ function TradeGrid({ h, accent }: { h: DocHeader; accent: string }) {
   );
 }
 
+/**
+ * CGST Rule 46 export endorsement + place of supply (EXPORT_OS_MASTER_PLAN Wave 1). Verbatim,
+ * prominent, printed on both invoice-type documents when the active CountryPack supplies it —
+ * absent (both blank) for a pack that doesn't, so this renders nothing rather than an empty box.
+ */
+function GstEndorsement({ endorsement, placeOfSupply, accent }: { endorsement: string; placeOfSupply: string; accent: string }) {
+  if (!endorsement && !placeOfSupply) return null;
+  return (
+    <View wrap={false} style={{ borderWidth: 0.75, borderColor: accent, backgroundColor: CANVAS, padding: '7 9', marginTop: 10 }}>
+      {endorsement ? (
+        <Text style={{ fontFamily: FB, fontSize: 7.5, color: INK, textTransform: 'uppercase', letterSpacing: 0.3, lineHeight: 1.4 }}>
+          {endorsement}
+        </Text>
+      ) : null}
+      {placeOfSupply ? (
+        <Text style={{ fontFamily: F, fontSize: 7, color: MUTED, marginTop: endorsement ? 4 : 0 }}>
+          Place of Supply: {placeOfSupply}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 function Th({ text, width, align = 'left' }: { text: string; width: number; align?: 'left' | 'right' }) {
   return (
     <View style={{ width, padding: '6 8' }}>
@@ -349,6 +372,10 @@ function DocumentPage({ model, branding }: { model: DocModel; branding?: PdfBran
       <DocumentHead h={model} accent={accent} />
       <PartyBoxes h={model} accent={accent} />
       <TradeGrid h={model} accent={accent} />
+
+      {isInvoice && (
+        <GstEndorsement endorsement={model.body.endorsement} placeOfSupply={model.body.placeOfSupply} accent={accent} />
+      )}
 
       {isInvoice && (
         <InvoiceTable

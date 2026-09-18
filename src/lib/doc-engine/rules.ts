@@ -1,4 +1,5 @@
 import type { DocModel, DocType, InvoiceBody, PackingBody } from './models';
+import { lutValidityProblem } from '@/packs/in/gst';
 
 /**
  * Deterministic cross-document rule engine (DOC_ENGINE_SPEC §2, build step 3).
@@ -204,6 +205,24 @@ export const RULES: Rule[] = [
         return [finding('in_gstin_format', 'warning', ['commercial_invoice'],
           `GSTIN "${ci.exporter.gstin}" is not in the expected 15-character format.`,
           'commercial_invoice.exporter.gstin')];
+      }
+      return [];
+    },
+  },
+  {
+    // Surfaced, not blocking (Wave 1) — the person decides, but knowingly: an expired LUT is a
+    // defect found at assessment, by which point the shipment has long gone, so this is flagged
+    // before issue rather than refused outright.
+    id: 'in_lut_validity',
+    severity: 'warning',
+    requires: ['commercial_invoice'],
+    packId: 'in',
+    check: (m) => {
+      const ci = invoice(m.get('commercial_invoice'));
+      if (!ci) return [];
+      const problem = lutValidityProblem(ci.gstExportUnderLut, ci.lutValidTo, ci.header.issuedAt);
+      if (problem) {
+        return [finding('in_lut_validity', 'warning', ['commercial_invoice', 'proforma_invoice'], problem, 'commercial_invoice.lutValidTo')];
       }
       return [];
     },

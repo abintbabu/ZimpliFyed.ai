@@ -1,0 +1,27 @@
+name: Tenant isolation (live)
+
+# Layer 3 (proof), EXPORT_OS_MASTER_PLAN §5.3 — merge-blocking, same triggers as CI, but kept in its
+# own workflow (not ci.yml) because ci.yml is deliberately DB-free/offline; this is the one check
+# that needs a real Postgres connection. Connects via DIRECT_URL, not the pooler — see
+# src/tests/security/tenant-isolation-live.test.ts's header comment.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  live-isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Live two-tenant isolation test
+        run: npm run test:security:live
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}

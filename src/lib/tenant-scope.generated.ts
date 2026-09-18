@@ -1,0 +1,56 @@
+// GENERATED FILE — do not edit by hand.
+// Run `npx tsx scripts/generate-tenant-scoped-models.ts` after any prisma/schema.prisma change
+// that adds, removes, or renames a tenant-scoped model. Verified in sync by
+// src/tests/security/tenant-scoped-models-sync.test.ts (part of `npm run test:security`).
+//
+// EXPORT_OS_MASTER_PLAN §5.2 — models with a direct `tenantId` field. Drives the Prisma
+// extension in src/lib/tenant-scope.ts and the live two-tenant test.
+
+export const TENANT_SCOPED_MODELS: ReadonlySet<string> = new Set([
+  "ActionQueueItem",
+  "Activity",
+  "AiInteraction",
+  "AuditEntry",
+  "BankRealization",
+  "Buyer",
+  "ComplianceItem",
+  "ConsentRecord",
+  "CostSheet",
+  "DocCounter",
+  "DocSet",
+  "Document",
+  "DomainEvent",
+  "Expense",
+  "ExportDocument",
+  "FeatureFlag",
+  "HsCode",
+  "InboxChannel",
+  "InboxMessage",
+  "IncentiveClaim",
+  "IntegrationCredential",
+  "Invite",
+  "Invoice",
+  "InvoiceTemplate",
+  "Job",
+  "Lead",
+  "LetterOfCredit",
+  "Membership",
+  "MeterEvent",
+  "NumberingSeries",
+  "Order",
+  "PriceList",
+  "Product",
+  "Quote",
+  "ScreeningCheck",
+  "ShipmentMilestone",
+  "SupportAccessGrant",
+  "Task",
+  "TenantBrandAsset",
+  "TenantDomain",
+  "TenantFact",
+  "TenantSettings",
+  "TermsClauseSet",
+  "Vendor",
+  "VendorRate",
+  "VendorRfq",
+]);

@@ -8,7 +8,13 @@ import { reportError } from '@/lib/observability';
  */
 
 export async function register() {
-  // Reserved for one-time startup initialization (tracing, metrics). Intentionally empty for now.
+  // EXPORT_OS_MASTER_PLAN §4.2 — ALLOW_DEV_TENANT_FALLBACK gates classifyHost's `dev` resolution
+  // (src/lib/tenant-resolver.ts), which lets an unmatched Host header resolve to a real tenant. That
+  // is a deliberate local-dev convenience and must never reach production; refuse to boot rather than
+  // silently allow it.
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_TENANT_FALLBACK === '1') {
+    throw new Error('ALLOW_DEV_TENANT_FALLBACK=1 must not be set in production — it disables tenant-host isolation.');
+  }
 }
 
 export async function onRequestError(

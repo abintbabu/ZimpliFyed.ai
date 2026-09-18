@@ -13,14 +13,19 @@ type WriteAuditInput = {
   before?: unknown;
   after?: unknown;
   metadata?: Record<string, unknown>;
+  /** Pass the active transaction client to make this write atomic with the rest of a `$transaction`
+   * (EXPORT_OS_MASTER_PLAN Wave 1 — the issue-transaction audit trail can't be a separate, unrelated
+   * write outside the transaction it's documenting). Defaults to the shared client. */
+  tx?: Prisma.TransactionClient;
 };
 
 /** The single chokepoint every mutating server action calls to record an AuditEntry. */
 export async function writeAudit(input: WriteAuditInput) {
   const session = await auth();
   const actorEmail = session?.user?.email ?? 'unknown';
+  const client = input.tx ?? prisma;
 
-  await prisma.auditEntry.create({
+  await client.auditEntry.create({
     data: {
       tenantId: input.session.tenantId,
       collection: input.collection,
