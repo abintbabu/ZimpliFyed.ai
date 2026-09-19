@@ -42,6 +42,8 @@ Neither is the product. The product is Anabyn's domain depth running on Zimplify
 
 Each seat below owns specific calls. When a decision in this document is contested, it is resolved by the seat that owns it.
 
+> **Canonical seat definitions now live in `docs/CXO_CHARTER.md`** (added 2026-09-19: CAIO and COO seats, CCO and CISO promoted to agent seats, decision-rights RACI, and the product's agent-employee roster). The briefs below remain the build-plan context for this document.
+
 ### CEO — what this company is
 **Mandate.** Indian and GCC exporters run a business with more statutory surface than a bank and less software than a coffee shop. We are the system of record for the whole cycle, and our moat is compliance depth that a horizontal CRM will never build.
 

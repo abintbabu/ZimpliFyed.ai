@@ -33,6 +33,8 @@ The strategic insight: an exporter's software budget is ~$1k/yr, but their **spe
 
 The defining bet: **AI is not a feature layer, it's headcount the customer doesn't hire.** Ship in this order; each level is a priced SKU.
 
+> *2026-09-19:* the full L3 agent roster (12 roles, ceilings, never-lists) is defined in `docs/CXO_CHARTER.md` Part II, and the per-result pricing path (Result-as-a-Service) in `docs/ROADMAP_2026_2029.md` §3.
+
 - **L1 — Assist (built):** draft-with-AI, spec extraction, HS suggestions, copilot Q&A. Included in plans; drives adoption.
 - **L2 — Autopilot per artifact (2027):** "Generate the complete, cross-validated doc set for shipment X" — one click, AI fills all 20+ docs, runs consistency checks (invoice↔packing list↔shipping bill↔LC), human approves. **Priced per shipment doc-set** ($5–25). This is engine 2's first product and the single highest-leverage build.
 - **L3 — Agents with jobs (2028):** long-running, named, auditable agents per persona:

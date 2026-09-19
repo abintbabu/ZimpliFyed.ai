@@ -1,5 +1,7 @@
 # Zimplifyed.ai — Complete Product Roadmap
 
+**3-year strategic layer (added 2026-09-19):** `docs/ROADMAP_2026_2029.md` sets the destination (Result-as-a-Service, Day-0 trader and Importer personas, AI-trajectory scenarios) and maps onto the phases below; seats and the agent-employee roster are in `docs/CXO_CHARTER.md`. This file remains the execution detail.
+
 **The single roadmap document.** Rewritten from scratch 2026-08-31, superseding the old migration tracker (see git history before this date for the port ledger). Companion docs: `VISION_1B.md` (long-horizon thesis), `docs/DECISIONS.md` (decision log — this rewrite proposes revisiting several locked calls; see §8 and the dated appendix entry there).
 
 ---
