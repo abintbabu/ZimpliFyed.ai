@@ -2,6 +2,7 @@ import Link from "next/link";
 
 export const metadata = {
   title: "Privacy Policy",
+  alternates: { canonical: "/privacy" },
 };
 
 const sections = [

@@ -1,8 +1,11 @@
 import Link from 'next/link';
+import { breadcrumbLd, jsonLd } from '@/lib/site';
 
 export const metadata = {
-  title: 'Free export tools — HS code finder & landed cost calculator',
-  description: 'Free tools for Indian exporters: estimate ITC-HS codes and compute Incoterm-aware landed cost and margin.',
+  title: 'Free export & import tools — HS code finder, landed cost, LC checker',
+  description:
+    'Free tools for Indian exporters and importers: estimate ITC-HS codes, compute Incoterm-aware landed cost and margin, and check a letter of credit for discrepancies.',
+  alternates: { canonical: '/tools' },
 };
 
 const TOOLS = [
@@ -26,6 +29,10 @@ const TOOLS = [
 export default function ToolsIndexPage() {
   return (
     <div className="mx-auto max-w-3xl px-5 py-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={jsonLd(breadcrumbLd([{ name: 'Home', path: '/' }, { name: 'Free tools', path: '/tools' }]))}
+      />
       <h1 className="text-3xl font-semibold tracking-tight text-ink">Free tools for exporters</h1>
       <p className="mt-3 text-muted">No sign-up required. Built by the team behind Zimplifyed.</p>
       <div className="mt-10 grid gap-4 sm:grid-cols-2">

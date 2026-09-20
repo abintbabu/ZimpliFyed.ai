@@ -1,0 +1,23 @@
+# Zimplifyed
+
+> Zimplifyed is the Export & Import OS for Indian businesses: one secure platform for buyer inquiries, quotes, vendor sourcing, landed cost, shipment documents and compliance, with AI drafting and cross-checking the paperwork. Built for small exporters, merchant traders and importers in India.
+
+Key facts:
+- Covers the export journey from inquiry to payment: quoting with Incoterm-aware cost build-ups, vendor RFQs, production tracking, shipment documents cross-checked against one source of order data, shipment milestones, invoicing and export-incentive tracking (RoDTEP, drawback).
+- Indian-compliance native: ITC-HS codes, GST/LUT, IEC, RCMC, shipping-bill fields and certificates of origin.
+- Free plan available, with paid plans priced in INR.
+- AI output is decision support. Duty rates, HS codes and LC reviews should be confirmed with a customs broker (CHA) or bank before filing.
+
+## Free tools
+- [HS code finder](https://zimplifyed.ai/tools/hs-finder): describe a product and get an estimated ITC-HS code with duty and RoDTEP hints
+- [Landed cost & margin calculator](https://zimplifyed.ai/tools/landed-cost): Incoterm-aware (EXW to DDP) per-unit landed cost, RoDTEP credit and margin
+- [LC discrepancy checker](https://zimplifyed.ai/tools/lc-checker): paste a letter of credit and get an AI review of unworkable clauses and date traps
+
+## Product
+- [Home](https://zimplifyed.ai/): what the platform does, stage by stage
+- [Pricing](https://zimplifyed.ai/pricing): plans in INR
+- [Security](https://zimplifyed.ai/security): workspace isolation, access control, encryption and data export, including what is not yet certified
+
+## Optional
+- [Terms of Service](https://zimplifyed.ai/terms)
+- [Privacy Policy](https://zimplifyed.ai/privacy)

@@ -3,7 +3,9 @@ import { GoogleSignInButton } from "@/components/auth/google-button";
 import { MagicLinkForm } from "@/components/auth/magic-link-form";
 
 export const metadata = {
-  title: "Sign up",
+  title: "Sign up free",
+  description: "Create a free Zimplifyed workspace for your export or import business. No card required.",
+  alternates: { canonical: "/signup" },
 };
 
 export default function SignupPage() {

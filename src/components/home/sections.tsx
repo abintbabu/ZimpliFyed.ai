@@ -233,10 +233,10 @@ export function Onboarding() {
 /* ---------- Security ---------- */
 export function Security() {
   const items = [
-    ["Role-based access", "Granular permissions and full audit logs on every record."],
-    ["Encryption", "Encrypted at rest and in transit, end to end."],
-    ["Tenant isolation", "Multi-tenant by design — your data is walled off, always."],
-    ["Built for SOC 2", "Controls designed to the SOC 2 framework as we scale."],
+    ["Role-based access", "Separate roles for sales, finance, procurement, logistics and more, with an audit trail of changes."],
+    ["Encryption", "Encrypted in transit over TLS. Stored integration credentials are sealed with AES-256-GCM."],
+    ["Workspace isolation", "Every database read and write is scoped to your company's workspace, enforced at the data layer."],
+    ["Your data, portable", "Admins can export the whole workspace as CSV files at any time."],
   ];
   return (
     <section id="security" className="scroll-mt-20 border-b border-line bg-white py-20 sm:py-28">

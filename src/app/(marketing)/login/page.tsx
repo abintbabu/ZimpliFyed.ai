@@ -5,6 +5,8 @@ import { MagicLinkForm } from "@/components/auth/magic-link-form";
 
 export const metadata = {
   title: "Log in",
+  alternates: { canonical: "/login" },
+  robots: { index: false, follow: true },
 };
 
 export default function LoginPage() {

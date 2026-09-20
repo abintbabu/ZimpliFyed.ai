@@ -1,5 +1,12 @@
 import { Container, Button, SectionHeading } from "@/components/ui";
 
+export const metadata = {
+  title: "Book a demo",
+  description:
+    "See Zimplifyed run an export shipment end to end: quoting, vendor sourcing, shipment documents and tracking on a live order.",
+  alternates: { canonical: "/demo" },
+};
+
 export default function DemoPage() {
   return (
     <section className="border-b border-line bg-white py-20 sm:py-28">

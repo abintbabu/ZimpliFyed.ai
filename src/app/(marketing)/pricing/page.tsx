@@ -4,9 +4,10 @@ import { PLANS, MONTHLY_INR, OVERAGE_INR, isUnlimited } from '@/lib/billing/plan
 import type { TenantPlan } from '@prisma/client';
 
 export const metadata = {
-  title: 'Pricing — Zimplifyed, the AI-first exporter OS',
+  title: 'Pricing — simple INR plans, start free',
   description:
     'Simple INR pricing for Indian exporters. Start free, upgrade when it pays for itself. One document set costs less than a fraction of a CHA’s per-shipment fee.',
+  alternates: { canonical: '/pricing' },
 };
 
 const ORDER: TenantPlan[] = ['free', 'starter', 'growth', 'enterprise'];

@@ -1,22 +1,41 @@
 import Link from "next/link";
 import { Container } from "@/components/ui";
+import { CONTACT_EMAIL } from "@/lib/site";
 
+// Only link to pages that exist — a dead "#" link wastes crawl budget and reads as an unfinished site.
 const cols = [
   {
-    title: "Product",
-    links: ["Quoting", "Vendor sourcing", "Documents", "Shipment tracking", "Incentives"],
+    title: "Platform",
+    links: [
+      { label: "How it works", href: "/#journey" },
+      { label: "Platform", href: "/#platform" },
+      { label: "Solutions", href: "/#solutions" },
+      { label: "Pricing", href: "/pricing" },
+    ],
   },
   {
-    title: "Solutions",
-    links: ["Merchant exporter", "Manufacturer-exporter", "Export ops", "Founders"],
+    title: "Free tools",
+    links: [
+      { label: "HS code finder", href: "/tools/hs-finder" },
+      { label: "Landed cost calculator", href: "/tools/landed-cost" },
+      { label: "LC discrepancy checker", href: "/tools/lc-checker" },
+      { label: "All tools", href: "/tools" },
+    ],
   },
   {
     title: "Company",
-    links: ["About", "Customers", "Security", "Contact"],
+    links: [
+      { label: "Security", href: "/security" },
+      { label: "Book a demo", href: "/demo" },
+      { label: "Contact", href: `mailto:${CONTACT_EMAIL}` },
+    ],
   },
   {
-    title: "Resources",
-    links: ["Blog", "Guides", "HS code lookup", "Compliance calendar"],
+    title: "Get started",
+    links: [
+      { label: "Start free", href: "/signup" },
+      { label: "Log in", href: "/login" },
+    ],
   },
 ];
 
@@ -35,8 +54,8 @@ export function SiteFooter() {
               </span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
-              The AI-first operating system for Indian exporters — from buyer
-              discovery to payment, in one connected suite.
+              The Export &amp; Import OS for Indian businesses — from buyer
+              inquiry to payment, in one secure platform.
             </p>
           </div>
 
@@ -45,12 +64,12 @@ export function SiteFooter() {
               <h3 className="text-sm font-semibold text-ink">{col.title}</h3>
               <ul className="mt-4 space-y-3">
                 {col.links.map((l) => (
-                  <li key={l}>
+                  <li key={l.href}>
                     <Link
-                      href="#"
+                      href={l.href}
                       className="text-sm text-muted transition-colors hover:text-ink"
                     >
-                      {l}
+                      {l.label}
                     </Link>
                   </li>
                 ))}
@@ -68,8 +87,8 @@ export function SiteFooter() {
             <Link href="/terms" className="hover:text-ink">
               Terms
             </Link>
-            <Link href="#" className="hover:text-ink">
-              Status
+            <Link href="/security" className="hover:text-ink">
+              Security
             </Link>
           </div>
         </div>
