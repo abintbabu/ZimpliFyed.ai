@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users2, CheckSquare, Settings, Truck, FileText, Receipt, Package, ScrollText, Gavel, Sparkles, Tags, ShieldCheck, ShieldAlert, PiggyBank, Sunrise, Building2, Boxes, ScanLine, Inbox, Calculator, ListChecks } from 'lucide-react';
+import { LayoutDashboard, Users2, CheckSquare, Settings, Truck, FileText, Receipt, Package, ScrollText, Gavel, Sparkles, Tags, ShieldCheck, ShieldAlert, PiggyBank, Sunrise, Building2, Boxes, ScanLine, Inbox, Calculator, ListChecks, Ship } from 'lucide-react';
 
 export const NAV_ICONS = {
   LayoutDashboard,
@@ -23,6 +23,7 @@ export const NAV_ICONS = {
   Inbox,
   Calculator,
   ListChecks,
+  Ship,
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;

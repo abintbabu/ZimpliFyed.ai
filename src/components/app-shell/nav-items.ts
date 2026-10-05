@@ -18,6 +18,7 @@ export const DASHBOARD_NAV_ITEMS: AppNavItem[] = [
   { label: 'Quotes', href: '/dashboard/quotes', icon: 'FileText', permission: 'quotes:read' },
   { label: 'HS Codes', href: '/dashboard/hs-codes', icon: 'Tags', permission: 'hs_codes:read' },
   { label: 'Orders', href: '/dashboard/orders', icon: 'Package', permission: 'orders:read' },
+  { label: 'Shipments', href: '/dashboard/shipments', icon: 'Ship', permission: 'orders:read' },
   { label: 'Invoices', href: '/dashboard/invoices', icon: 'Receipt', permission: 'invoices:read' },
   { label: 'Expenses', href: '/dashboard/expenses', icon: 'ScanLine', permission: 'expenses:read' },
   { label: 'Incentives', href: '/dashboard/incentives', icon: 'PiggyBank', permission: 'incentives:read' },

@@ -14,6 +14,10 @@ export async function allocateDocNumber(tenantId: string, prefix: DocNumberPrefi
       const start = (await prisma.order.count({ where: { tenantId } })) + 1;
       return pickFreeDocNumber(prefix, start, now, async (n) => !!(await prisma.order.findFirst({ where: { tenantId, orderNumber: n }, select: { id: true } })));
     }
+    case 'SHP': {
+      const start = (await prisma.shipment.count({ where: { tenantId } })) + 1;
+      return pickFreeDocNumber(prefix, start, now, async (n) => !!(await prisma.shipment.findFirst({ where: { tenantId, shipmentNumber: n }, select: { id: true } })));
+    }
     case 'INV': {
       const start = (await prisma.invoice.count({ where: { tenantId } })) + 1;
       return pickFreeDocNumber(prefix, start, now, async (n) => !!(await prisma.invoice.findFirst({ where: { tenantId, invoiceNumber: n }, select: { id: true } })));

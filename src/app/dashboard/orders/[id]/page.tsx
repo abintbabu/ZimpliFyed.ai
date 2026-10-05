@@ -18,6 +18,8 @@ import { ShipmentTimelinePanel } from '@/components/shipment-timeline-panel';
 import { LcAdvisorPanel } from '@/components/lc-advisor-panel';
 import { OrderPnlPanel } from '@/components/order-pnl-panel';
 import { OrderStatusActions } from './order-status-actions';
+import { listShipmentsForOrder } from '@/actions/shipments';
+import { OrderShipmentAction } from './order-shipment-action';
 import { OrderInvoiceAction } from './order-invoice-action';
 import { OrderBuyerTrackPanel } from './order-buyer-track';
 
@@ -39,6 +41,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const pnl = await getOrderPnl(order.id);
   const docContext = await buildDocContext(tenantId, order.id);
   const docSet = await getOrderDocSet(order.id);
+  const shipments = await listShipmentsForOrder(tenantId, order.id);
 
   return (
     <div className="space-y-6">
@@ -48,6 +51,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <p className="text-sm text-muted capitalize">{order.status.replace('_', ' ')}</p>
         </div>
         <div className="flex items-center gap-3">
+          <OrderShipmentAction orderId={order.id} shipments={shipments} canWrite={hasPermission(role, 'orders:write')} />
           <OrderInvoiceAction
             orderId={order.id}
             invoiceId={invoice?.id ?? null}

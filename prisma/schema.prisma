@@ -115,6 +115,8 @@ model Tenant {
   hsCodes            HsCode[]
   complianceItems    ComplianceItem[]
   shipmentMilestones ShipmentMilestone[]
+  shipments          Shipment[]
+  freightQuotes      FreightQuote[]
   screeningChecks    ScreeningCheck[]
   lettersOfCredit    LetterOfCredit[]
   incentiveClaims    IncentiveClaim[]
@@ -754,6 +756,7 @@ model Order {
   exportDocuments    ExportDocument[]
   docSets            DocSet[]
   shipmentMilestones ShipmentMilestone[]
+  shipmentOrders     ShipmentOrder[]
   lettersOfCredit    LetterOfCredit[]
   incentiveClaims    IncentiveClaim[]
   expenses           Expense[]
@@ -2091,4 +2094,121 @@ model NumberingCounter {
   next      Int    @default(1)
 
   @@unique([seriesId, periodKey])
+}
+
+// MODULE_GAP_PLAN phase 0 — Logistics. One Shipment per booking; may carry several Orders
+// (consolidation) via ShipmentOrder. ShipmentMilestone keeps its order link (expand phase).
+
+enum ShipmentMode {
+  sea_fcl
+  sea_lcl
+  air
+  road
+  courier
+}
+
+enum ShipmentStatus {
+  planning
+  booked
+  in_transit
+  arrived
+  delivered
+  cancelled
+}
+
+model Shipment {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isDemo   Boolean @default(false)
+
+  shipmentNumber String
+  mode           ShipmentMode
+  status         ShipmentStatus @default(planning)
+
+  forwarderName String?
+  carrier       String?
+  vesselOrFlight String?
+  bookingNumber String?
+  originPort    String?
+  destPort      String?
+  etd           DateTime?
+  eta           DateTime?
+
+  // Shipping documents (metadata only; files live in Document).
+  blNumber           String?
+  blDate             DateTime?
+  shippingBillNumber String?
+  shippingBillDate   DateTime?
+  shippingBillPort   String?
+
+  notes String?
+
+  orders        ShipmentOrder[]
+  containers    Container[]
+  freightQuotes FreightQuote[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, shipmentNumber])
+  @@index([tenantId, status])
+}
+
+model ShipmentOrder {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([shipmentId, orderId])
+  @@index([orderId])
+}
+
+model Container {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  containerNumber String?
+  type            String? // 20GP, 40GP, 40HC, reefer…
+  sealNumber      String?
+  grossWeightKg   Float?
+  cbm             Float?
+
+  createdAt DateTime @default(now())
+
+  @@index([shipmentId])
+}
+
+enum FreightQuoteStatus {
+  requested
+  received
+  accepted
+  rejected
+  expired
+}
+
+model FreightQuote {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  forwarderName String
+  mode          ShipmentMode
+  currency      String       @default("USD")
+  amount        Float?
+  transitDays   Int?
+  validTo       DateTime?
+  status        FreightQuoteStatus @default(requested)
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, shipmentId])
 }

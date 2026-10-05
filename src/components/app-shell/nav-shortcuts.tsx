@@ -16,6 +16,7 @@ export const NAV_CHORDS: Record<string, string> = {
   '/dashboard/rfqs': 'r',
   '/dashboard/quotes': 'q',
   '/dashboard/orders': 'o',
+  '/dashboard/shipments': 's',
   '/dashboard/invoices': 'i',
   '/dashboard/expenses': 'e',
   '/dashboard/compliance': 'c',
