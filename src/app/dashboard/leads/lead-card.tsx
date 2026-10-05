@@ -4,10 +4,11 @@ import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateLeadStage } from '@/actions/leads';
 import { convertLeadToBuyer } from '@/actions/buyers';
+import { convertLeadToQuote } from '@/actions/convert';
 import { LEAD_STAGES, LEAD_STAGE_LABELS } from './lead-stages';
 import type { Lead } from '@prisma/client';
 
-export function LeadCard({ lead, canWrite }: { lead: Lead; canWrite: boolean }) {
+export function LeadCard({ lead, canWrite, canQuote }: { lead: Lead; canWrite: boolean; canQuote: boolean }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -27,6 +28,20 @@ export function LeadCard({ lead, canWrite }: { lead: Lead; canWrite: boolean }) 
             <option key={s} value={s}>{LEAD_STAGE_LABELS[s]}</option>
           ))}
         </select>
+      )}
+      {canQuote && lead.stage !== 'Lost' && (
+        <button
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              const quote = await convertLeadToQuote(lead.id);
+              router.push(`/dashboard/quotes/${quote.id}`);
+            })
+          }
+          className="block text-xs font-medium text-brand hover:underline disabled:opacity-50"
+        >
+          Create quote →
+        </button>
       )}
       {canWrite && (
         lead.convertedBuyerId ? (

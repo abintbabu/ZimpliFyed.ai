@@ -7,6 +7,7 @@ import { AppMobileNav } from './app-mobile-nav';
 import { trackAppPath } from './back-button';
 import { usePanelTheme } from './use-panel-theme';
 import { CommandPalette } from './command-palette';
+import { NavShortcuts } from './nav-shortcuts';
 import type { AppNavItem } from './types';
 
 type AppShellProps = {
@@ -64,6 +65,7 @@ export function AppShell({
       </main>
 
       <CommandPalette navItems={navItems} />
+      <NavShortcuts navItems={navItems} />
     </div>
   );
 }

@@ -18,6 +18,7 @@ import { ShipmentTimelinePanel } from '@/components/shipment-timeline-panel';
 import { LcAdvisorPanel } from '@/components/lc-advisor-panel';
 import { OrderPnlPanel } from '@/components/order-pnl-panel';
 import { OrderStatusActions } from './order-status-actions';
+import { OrderInvoiceAction } from './order-invoice-action';
 import { OrderBuyerTrackPanel } from './order-buyer-track';
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -46,7 +47,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <h1 className="text-2xl font-semibold text-ink">{order.orderNumber}</h1>
           <p className="text-sm text-muted capitalize">{order.status.replace('_', ' ')}</p>
         </div>
-        <OrderStatusActions orderId={order.id} status={order.status} canWrite={hasPermission(role, 'orders:write')} />
+        <div className="flex items-center gap-3">
+          <OrderInvoiceAction
+            orderId={order.id}
+            invoiceId={invoice?.id ?? null}
+            canWrite={hasPermission(role, 'invoices:write')}
+          />
+          <OrderStatusActions orderId={order.id} status={order.status} canWrite={hasPermission(role, 'orders:write')} />
+        </div>
       </div>
 
       <DealRail current="order" quote={order.quote} order={order} invoice={invoice} />

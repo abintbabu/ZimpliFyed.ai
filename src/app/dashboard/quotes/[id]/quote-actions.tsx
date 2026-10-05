@@ -49,7 +49,7 @@ export function QuoteActions({ quoteId, status, canWrite }: { quoteId: string; s
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              const order = await createOrderFromQuote(quoteId, { orderNumber: `ORD-${quoteId.slice(-6).toUpperCase()}` });
+              const order = await createOrderFromQuote(quoteId);
               router.push(`/dashboard/orders/${order.id}`);
             })
           }

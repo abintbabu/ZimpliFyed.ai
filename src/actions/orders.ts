@@ -6,6 +6,7 @@ import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { writeDomainEvent } from '@/lib/domain-events';
+import { allocateDocNumber } from '@/lib/doc-number-alloc';
 import type { OrderStatus } from '@prisma/client';
 
 export async function listOrders(tenantId: string) {
@@ -23,8 +24,13 @@ export async function getOrder(tenantId: string, orderId: string) {
   });
 }
 
+/**
+ * Quote → order in one step. Everything is carried over from the quote: buyer, a product summary from
+ * its lines, and the total quantity. Every input is an optional override. Idempotent: an already
+ * converted quote returns its existing order instead of creating a second one.
+ */
 export async function createOrderFromQuote(quoteId: string, input: {
-  orderNumber: string;
+  orderNumber?: string;
   product?: string;
   quantity?: number;
   unit?: string;
@@ -32,24 +38,35 @@ export async function createOrderFromQuote(quoteId: string, input: {
   destination?: string;
   originPort?: string;
   destPort?: string;
-}) {
+} = {}) {
   const session = await requireTenantSession();
   const { tenantId, role } = session;
   if (!hasPermission(role, 'orders:write')) throw new Error('You do not have permission to create orders');
 
-  const quote = await prisma.quote.findFirst({ where: { id: quoteId, tenantId } });
+  const quote = await prisma.quote.findFirst({ where: { id: quoteId, tenantId }, include: { lines: true, buyer: true } });
   if (!quote) throw new Error('Quote not found');
   if (quote.status !== 'accepted') throw new Error('Only accepted quotes can be converted to orders');
+
+  if (quote.orderId) {
+    const existing = await prisma.order.findFirst({ where: { id: quote.orderId, tenantId } });
+    if (existing) return existing;
+  }
+
+  const firstLine = quote.lines[0]?.description;
+  const carriedProduct = firstLine ? (quote.lines.length > 1 ? `${firstLine} +${quote.lines.length - 1} more` : firstLine) : null;
+  const totalQty = quote.lines.reduce((sum, l) => sum + l.quantity, 0);
+  const orderNumber = input.orderNumber?.trim() || (await allocateDocNumber(tenantId, 'ORD'));
 
   const order = await prisma.order.create({
     data: {
       tenantId,
-      orderNumber: input.orderNumber,
-      product: input.product || null,
-      quantity: input.quantity ?? null,
+      orderNumber,
+      buyerId: quote.buyerId,
+      product: input.product || carriedProduct,
+      quantity: input.quantity ?? (totalQty > 0 ? totalQty : null),
       unit: input.unit || null,
       incoterm: input.incoterm || null,
-      destination: input.destination || null,
+      destination: input.destination || quote.buyer?.country || null,
       originPort: input.originPort || null,
       destPort: input.destPort || null,
       quote: { connect: { id: quoteId } },

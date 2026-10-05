@@ -35,7 +35,7 @@ export default async function LeadsPage() {
               </p>
               <div className="space-y-2">
                 {stageLeads.map((lead) => (
-                  <LeadCard key={lead.id} lead={lead} canWrite={canWrite} />
+                  <LeadCard key={lead.id} lead={lead} canWrite={canWrite} canQuote={canQuote} />
                 ))}
               </div>
             </div>

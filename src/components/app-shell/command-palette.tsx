@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, CornerDownLeft } from 'lucide-react';
 import { NAV_ICONS, type NavIconName } from './nav-icons';
+import { NAV_CHORDS } from './nav-shortcuts';
 import type { AppNavItem } from './types';
 
 type PaletteItem = { label: string; href: string; icon: NavIconName };
@@ -102,6 +103,9 @@ export function CommandPalette({ navItems }: { navItems: AppNavItem[] }) {
               >
                 <Icon className={`h-4 w-4 ${active ? 'text-white' : 'opacity-60'}`} />
                 <span className="flex-1 truncate font-medium">{item.label}</span>
+                {NAV_CHORDS[item.href] && !active && (
+                  <kbd className="rounded border border-line px-1.5 py-0.5 text-[10px] font-medium text-muted">g {NAV_CHORDS[item.href]}</kbd>
+                )}
                 {active && <CornerDownLeft className="h-3.5 w-3.5 opacity-70" />}
               </button>
             );
