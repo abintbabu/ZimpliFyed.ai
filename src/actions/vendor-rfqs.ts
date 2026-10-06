@@ -10,7 +10,9 @@ import { approveAiInteraction } from '@/ai/approval';
 import { z } from 'zod';
 import { INCOTERMS } from '@/lib/landed-cost';
 
-export async function listVendorRfqs(tenantId: string) {
+export async function listVendorRfqs() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'vendors:read')) throw new Error('You do not have permission to view this');
   return prisma.vendorRfq.findMany({
     where: { tenantId },
     include: { invites: { include: { vendor: true } }, quotes: true },
@@ -18,7 +20,9 @@ export async function listVendorRfqs(tenantId: string) {
   });
 }
 
-export async function getVendorRfq(tenantId: string, rfqId: string) {
+export async function getVendorRfq(rfqId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'vendors:read')) throw new Error('You do not have permission to view this');
   return prisma.vendorRfq.findFirst({
     where: { id: rfqId, tenantId },
     include: {

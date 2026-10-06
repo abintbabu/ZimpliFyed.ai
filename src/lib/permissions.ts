@@ -124,3 +124,31 @@ export function hasPermission(role: MembershipRole | null | undefined, permissio
   if (!role) return false;
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
 }
+
+/**
+ * Roles that hold OWNER_ONLY. The last one in a tenant can't be demoted or removed — otherwise a
+ * workspace can be left with nobody able to reach billing, domains, or org transfer, which is
+ * unrecoverable without platform-admin intervention (EXPORT_OS_MASTER_PLAN §6.1: owner and
+ * super_admin are treated identically until the contract step drops super_admin).
+ */
+export const OWNER_ROLES: readonly MembershipRole[] = ['owner', 'super_admin'];
+
+export function isOwnerRole(role: MembershipRole): boolean {
+  return OWNER_ROLES.includes(role);
+}
+
+/**
+ * The roles assignable to a teammate from the members screen.
+ *
+ * Excluded on purpose:
+ *  - `customer` / `vendor` — external portal identities with zero staff permissions. Assigning one
+ *    to a teammate silently locks them out of the whole dashboard, which read as a bug.
+ *  - `super_admin` — the legacy owner alias being retired (§6.1); new grants use `owner`.
+ */
+export const ASSIGNABLE_ROLES: readonly MembershipRole[] = [
+  'owner', 'admin', 'ops_admin', 'sales', 'finance', 'procurement', 'production', 'logistics', 'marketing', 'viewer',
+];
+
+export function isAssignableRole(role: MembershipRole): boolean {
+  return ASSIGNABLE_ROLES.includes(role);
+}

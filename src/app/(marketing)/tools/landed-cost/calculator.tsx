@@ -16,6 +16,9 @@ const CATEGORIES: { key: CostCategory; label: string }[] = [
   { key: 'finance_cost', label: 'Finance cost' },
   { key: 'duties', label: 'Duties' },
   { key: 'other', label: 'Other' },
+  { key: 'commission', label: 'Agent commission' },
+  { key: 'bank_charges', label: 'Bank charges' },
+  { key: 'documentation', label: 'Documentation charges' },
 ];
 
 export function LandedCostCalculator() {

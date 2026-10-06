@@ -7,7 +7,9 @@ import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import type { TaskLinkedType, TaskPriority, TaskStatus } from '@prisma/client';
 
-export async function listTasks(tenantId: string) {
+export async function listTasks() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'tasks:read')) throw new Error('You do not have permission to view this');
   return prisma.task.findMany({
     where: { tenantId },
     orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],

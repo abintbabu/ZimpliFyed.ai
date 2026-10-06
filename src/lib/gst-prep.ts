@@ -8,6 +8,8 @@
  * GSTR-2B. Outward invoices are summarised by currency as zero-rated turnover for context. This is a working
  * summary for the CA — not a filed return.
  */
+import { signedInvoiceTotal } from './invoice-notes';
+
 
 export type PrepExpense = {
   id: string;
@@ -25,6 +27,7 @@ export type PrepInvoice = {
   currency: string;
   total: number;
   isCreditOrDebitNote: boolean;
+  noteKind?: 'credit' | 'debit' | null;
 };
 
 export type GstHeadSummary = { gstHead: string; count: number; total: number };
@@ -84,8 +87,8 @@ export function buildGstPrepPack(period: string, expenses: PrepExpense[], invoic
   for (const inv of invoices) {
     const bucket = currencyTotals.get(inv.currency) ?? { count: 0, total: 0 };
     bucket.count += 1;
-    // Credit/debit notes net against turnover.
-    bucket.total += inv.isCreditOrDebitNote ? -AMOUNT(inv.total) : AMOUNT(inv.total);
+    // Credit notes net against turnover; debit notes add to it (legacy untyped notes count as credits).
+    bucket.total += signedInvoiceTotal({ ...inv, total: AMOUNT(inv.total) });
     currencyTotals.set(inv.currency, bucket);
   }
   const byCurrency = [...currencyTotals.entries()]

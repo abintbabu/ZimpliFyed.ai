@@ -61,6 +61,17 @@ function exp(over: Partial<PrepExpense>): PrepExpense {
   assert.equal(usd.count, 2);
 }
 
+// Typed notes: a credit subtracts, a debit ADDS (it used to subtract — every note was assumed to be a credit).
+{
+  const invoices: PrepInvoice[] = [
+    { id: 'a', currency: 'USD', total: 10000, isCreditOrDebitNote: false },
+    { id: 'b', currency: 'USD', total: 1000, isCreditOrDebitNote: true, noteKind: 'credit' },
+    { id: 'c', currency: 'USD', total: 400, isCreditOrDebitNote: true, noteKind: 'debit' },
+  ];
+  const usd = buildGstPrepPack('2026-06', [], invoices).outward.byCurrency.find((c) => c.currency === 'USD')!;
+  assert.equal(usd.total, 9400, '10000 − 1000 credit + 400 debit');
+}
+
 // periodBounds yields a half-open UTC month and rejects garbage.
 {
   const { start, end } = periodBounds('2026-06');

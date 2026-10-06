@@ -8,7 +8,9 @@ import { writeAudit } from '@/lib/audit';
 import { screenAgainstConsolidatedList } from '@/lib/screening';
 import { requireFeature } from '@/lib/billing/entitlements';
 
-export async function listScreeningChecks(tenantId: string) {
+export async function listScreeningChecks() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'compliance:read')) throw new Error('You do not have permission to view this');
   return prisma.screeningCheck.findMany({ where: { tenantId }, orderBy: { checkedAt: 'desc' }, take: 50 });
 }
 

@@ -1,19 +1,19 @@
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { listTasks } from '@/actions/tasks';
-import { listMembers } from '@/actions/users';
+import { listAssignableMembers } from '@/actions/users';
 import { TASK_STATUSES, TASK_STATUS_LABELS } from './task-constants';
 import { TaskCard } from './task-card';
 import { NewTaskForm } from './new-task-form';
 
 export default async function TasksPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'tasks:read')) {
     return <p className="text-sm text-muted">You do not have access to tasks.</p>;
   }
 
   const canWrite = hasPermission(role, 'tasks:write');
-  const [tasks, members] = await Promise.all([listTasks(tenantId), listMembers(tenantId)]);
+  const [tasks, members] = await Promise.all([listTasks(), listAssignableMembers()]);
 
   return (
     <div className="space-y-6">

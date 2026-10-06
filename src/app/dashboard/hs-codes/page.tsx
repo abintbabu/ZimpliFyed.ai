@@ -6,10 +6,10 @@ import { PageHeader } from '@/components/dashboard/page-header';
 import { HsCodeLookup } from './hs-code-lookup';
 
 export default async function HsCodesPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'hs_codes:read')) redirect('/dashboard');
 
-  const history = await listHsCodes(tenantId);
+  const history = await listHsCodes();
 
   return (
     <div className="space-y-6">

@@ -11,13 +11,13 @@ import { NewBuyerForm } from './new-buyer-form';
 type Buyer = Awaited<ReturnType<typeof listBuyers>>[number];
 
 export default async function BuyersPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'customers:read')) {
     return <p className="text-sm text-muted">You do not have access to buyers.</p>;
   }
 
   const canWrite = hasPermission(role, 'customers:write');
-  const buyers = await listBuyers(tenantId);
+  const buyers = await listBuyers();
 
   const columns: DataTableColumn<Buyer>[] = [
     {

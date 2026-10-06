@@ -18,16 +18,16 @@ function isOverdue(dueDate: Date | null, balanceDue: number, isCreditOrDebitNote
 }
 
 export default async function InvoicesPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'invoices:read')) {
     return <p className="text-sm text-muted">You do not have access to invoices.</p>;
   }
 
   const canWrite = hasPermission(role, 'invoices:write');
   const [invoices, rawTemplates, orders] = await Promise.all([
-    listInvoices(tenantId),
-    canWrite ? listInvoiceTemplates(tenantId) : Promise.resolve([]),
-    canWrite ? listOrders(tenantId) : Promise.resolve([]),
+    listInvoices(),
+    canWrite ? listInvoiceTemplates() : Promise.resolve([]),
+    canWrite ? listOrders() : Promise.resolve([]),
   ]);
 
   const templates: TemplateOption[] = rawTemplates.map((t) => ({
@@ -85,6 +85,9 @@ export default async function InvoicesPage() {
               <NewInvoiceForm
                 templates={templates}
                 orders={orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber }))}
+                invoices={invoices
+                  .filter((i) => !i.isCreditOrDebitNote && i.status !== 'void' && i.status !== 'draft')
+                  .map((i) => ({ id: i.id, invoiceNumber: i.invoiceNumber, currency: i.currency, total: i.total }))}
               />
             </div>
           )

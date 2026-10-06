@@ -1,4 +1,5 @@
 import type { DocModel, DocHeader, BankDetails, InvoiceLine, PackingLine } from './models';
+import type { PackingCartonRow, PackingTotals } from '@/lib/packing';
 
 /**
  * Render layer (DOC_ENGINE_SPEC §1.2). A pure `DocModel → print-ready HTML string` — the document, on an
@@ -120,6 +121,34 @@ function packingTable(lines: PackingLine[], totalQty: number): string {
     </table>`;
 }
 
+const fmtKg = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtCbm = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+/** Carton-level packing detail: marks, carton serials, weights, dimensions and CBM — what a CHA reads. */
+function cartonTable(cartons: PackingCartonRow[], t: PackingTotals): string {
+  const rows = cartons
+    .map(
+      (c) => `<tr>
+        <td class="mono">${esc(c.cartonRange)}</td>
+        <td>${esc(c.marks ?? '')}</td>
+        <td>${esc(c.description ?? '')}</td>
+        <td class="num">${c.cartonCount.toLocaleString('en-IN')}</td>
+        <td class="num">${c.qtyPerCarton.toLocaleString('en-IN')}</td>
+        <td class="num">${fmtKg(c.totalNetKg)}</td>
+        <td class="num">${fmtKg(c.totalGrossKg)}</td>
+        <td class="num">${c.lengthCm}×${c.widthCm}×${c.heightCm}</td>
+        <td class="num">${fmtCbm(c.totalCbm)}</td>
+      </tr>`,
+    )
+    .join('');
+  return `
+    <table>
+      <thead><tr><th>Carton nos.</th><th>Marks</th><th>Goods</th><th class="num">Cartons</th><th class="num">Qty / carton</th><th class="num">Net kg</th><th class="num">Gross kg</th><th class="num">L×W×H cm</th><th class="num">CBM</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="3" class="strong">Total</td><td class="num strong">${t.cartons.toLocaleString('en-IN')}</td><td></td><td class="num strong">${fmtKg(t.netWeightKg)}</td><td class="num strong">${fmtKg(t.grossWeightKg)}</td><td></td><td class="num strong">${fmtCbm(t.cbm)}</td></tr></tfoot>
+    </table>`;
+}
+
 function body(model: DocModel): string {
   switch (model.type) {
     case 'proforma_invoice':
@@ -130,7 +159,8 @@ function body(model: DocModel): string {
         + bankBlock(model.bank)
       );
     case 'packing_list':
-      return packingTable(model.body.lines, model.body.totalQuantity);
+      return packingTable(model.body.lines, model.body.totalQuantity)
+        + (model.body.cartons && model.body.totals ? cartonTable(model.body.cartons, model.body.totals) : '');
     case 'certificate_of_origin':
       return `${packingTable(model.body.lines, model.body.lines.reduce((s, l) => s + l.quantity, 0))}
         <div class="declaration"><div class="lbl">Country of Origin</div><div class="strong">${esc(model.body.countryOfOrigin)}</div><p>${esc(model.body.declaration)}</p></div>`;

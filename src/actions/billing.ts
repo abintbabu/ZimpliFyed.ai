@@ -12,8 +12,8 @@ function appUrl(): string {
 }
 
 export async function startCheckoutAction(plan: TenantPlan) {
-  const session = await requireTenantSession();
-  if (!hasPermission(session.role, 'users:manage')) throw new Error('Only owners and admins can manage billing');
+  const session = await requireTenantSession({ allowSuspended: true });
+  if (!hasPermission(session.role, 'billing:manage')) throw new Error('Only the workspace owner can manage billing');
   if (plan === 'free') throw new Error('Free plan does not require checkout');
 
   const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { email: true } });
@@ -30,8 +30,8 @@ export async function startCheckoutAction(plan: TenantPlan) {
 }
 
 export async function startOverageCheckoutAction(pack: OveragePack) {
-  const session = await requireTenantSession();
-  if (!hasPermission(session.role, 'users:manage')) throw new Error('Only owners and admins can manage billing');
+  const session = await requireTenantSession({ allowSuspended: true });
+  if (!hasPermission(session.role, 'billing:manage')) throw new Error('Only the workspace owner can manage billing');
 
   const base = appUrl();
   const provider = await getBillingProviderForTenant(session.tenantId);
@@ -44,8 +44,8 @@ export async function startOverageCheckoutAction(pack: OveragePack) {
 }
 
 export async function openBillingPortalAction() {
-  const session = await requireTenantSession();
-  if (!hasPermission(session.role, 'users:manage')) throw new Error('Only owners and admins can manage billing');
+  const session = await requireTenantSession({ allowSuspended: true });
+  if (!hasPermission(session.role, 'billing:manage')) throw new Error('Only the workspace owner can manage billing');
 
   const base = appUrl();
   const provider = await getBillingProviderForTenant(session.tenantId);

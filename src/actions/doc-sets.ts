@@ -50,7 +50,8 @@ export async function getOrderDocSet(orderId: string): Promise<{
   findings: Finding[];
   documents: { id: string; type: DocType; docNumber: string | null; model: DocModel | null; findings: Finding[] }[];
 } | null> {
-  const { tenantId } = await requireTenantSession();
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'orders:read')) throw new Error('You do not have permission to view this');
   const docSet = await prisma.docSet.findFirst({
     where: { tenantId, orderId },
     orderBy: { version: 'desc' },

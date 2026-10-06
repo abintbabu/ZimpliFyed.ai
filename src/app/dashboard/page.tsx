@@ -32,11 +32,11 @@ export default async function DashboardPage() {
         ? prisma.task.count({ where: { tenantId, status: { in: ['open', 'in_progress'] } } })
         : Promise.resolve(0),
       loadTodayQueue(tenantId, role),
-      canReadIncentives ? claimableIncentiveTotal(tenantId) : Promise.resolve(0),
+      canReadIncentives ? claimableIncentiveTotal() : Promise.resolve(0),
       canReadOrders
         ? prisma.order.count({ where: { tenantId, status: { in: ['confirmed', 'in_production', 'shipped', 'in_transit'] } } })
         : Promise.resolve(0),
-      computeChecklist(tenantId),
+      computeChecklist(),
       prisma.lead.count({ where: { tenantId, isDemo: true } }),
     ]);
 

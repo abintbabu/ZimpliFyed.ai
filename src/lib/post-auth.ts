@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from './prisma';
 import { emailDomain, isFreeMailDomain } from './slug';
+import { canRedeemInvite, isInviteUsable } from './team-guards';
 
 export type Destination =
   | { kind: 'dashboard'; tenantSlug: string }
@@ -21,7 +22,7 @@ export async function resolvePostAuthDestination(
 
   // 0. Stashed link-invite token (cookie set before auth).
   if (linkInviteToken) {
-    const slug = await consumeLinkInvite(user.id, linkInviteToken);
+    const slug = await consumeLinkInvite(user.id, linkInviteToken, email);
     if (slug) {
       await setLastActive(user.id, slug.tenantId);
       return { kind: 'dashboard', tenantSlug: slug.slug };
@@ -93,6 +94,7 @@ async function setLastActive(userId: string, tenantId: string): Promise<string |
 async function consumeLinkInvite(
   userId: string,
   token: string,
+  authedEmail: string | null,
 ): Promise<{ tenantId: string; slug: string } | null> {
   // Tokens are globally unique (like the public-token pattern, §4.5) — resolved by token, not
   // tenant context, before any tenant is known.
@@ -102,8 +104,8 @@ async function consumeLinkInvite(
     include: { tenant: { select: { slug: true } } },
   });
   if (!invite) return null;
-  if (invite.expiresAt && invite.expiresAt < new Date()) return null;
-  if (invite.maxUses != null && invite.useCount >= invite.maxUses) return null;
+  if (!isInviteUsable(invite)) return null;
+  if (!canRedeemInvite(invite.email, authedEmail)) return null;
 
   await prisma.$transaction([
     prisma.membership.upsert({

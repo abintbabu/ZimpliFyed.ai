@@ -1,5 +1,6 @@
 'use server';
 
+import { randomBytes } from 'node:crypto';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -7,12 +8,15 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
+import { denyInvite, normaliseInviteEmail } from '@/lib/team-guards';
 import { isValidSlug, slugify } from '@/lib/slug';
 import { seedDemoData, clearDemoData as clearDemo } from '@/lib/seed-demo';
 import { checkRateLimitDb } from '@/lib/rate-limit-db';
+import { sendInviteEmail } from '@/lib/invite-email';
 import type { BusinessType, MembershipRole } from '@prisma/client';
 
 const MAX_OWNED_TENANTS = 3;
+const INVITE_TTL_DAYS = 14;
 
 async function clientIp(): Promise<string> {
   const h = await headers();
@@ -143,7 +147,7 @@ export async function joinByDomain(tenantSlug: string): Promise<{ error: string 
 
 export async function clearDemoData(): Promise<{ error: string } | { ok: true }> {
   const s = await requireTenantSession();
-  if (!hasPermission(s.role, 'users:manage')) return { error: 'Not allowed' };
+  if (!hasPermission(s.role, 'settings:manage')) return { error: 'Not allowed' };
   await clearDemo(s.tenantId);
   return { ok: true };
 }
@@ -175,7 +179,8 @@ export type ChecklistState = {
 };
 
 /** Cheap existence queries; stamps completion timestamps into Tenant.onboarding so we stop recomputing solved steps. */
-export async function computeChecklist(tenantId: string): Promise<ChecklistState> {
+export async function computeChecklist(): Promise<ChecklistState> {
+  const { tenantId } = await requireTenantSession();
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { onboarding: true } });
   const stamped = (tenant?.onboarding ?? {}) as Record<string, string>;
 
@@ -218,14 +223,18 @@ export async function computeChecklist(tenantId: string): Promise<ChecklistState
 
 export async function createInviteLink(role: MembershipRole, opts?: { maxUses?: number; expiresInDays?: number }) {
   const s = await requireTenantSession();
-  if (!hasPermission(s.role, 'users:manage')) return { error: 'Not allowed' as const };
-  const { randomBytes } = await import('node:crypto');
+  // A shareable link that mints owners would let anyone holding the URL take the workspace, so
+  // link invites go through the same role-assignment guard as a targeted one.
+  const denied = denyInvite(s.role, role);
+  if (denied) return { error: denied };
   const token = randomBytes(18).toString('base64url');
   await prisma.invite.create({
     data: {
       tenantId: s.tenantId, email: null, role, token,
       maxUses: opts?.maxUses ?? null,
-      expiresAt: opts?.expiresInDays ? new Date(Date.now() + opts.expiresInDays * 86_400_000) : null,
+      // A link invite with no expiry is a permanent, shareable key to the workspace. Default to
+      // the same 14 days as an email invite unless the caller asks for something else.
+      expiresAt: new Date(Date.now() + (opts?.expiresInDays ?? INVITE_TTL_DAYS) * 86_400_000),
       invitedByUserId: s.userId,
     },
   });
@@ -234,25 +243,50 @@ export async function createInviteLink(role: MembershipRole, opts?: { maxUses?: 
 
 export async function revokeInvite(inviteId: string) {
   const s = await requireTenantSession();
-  if (!hasPermission(s.role, 'users:manage')) return { error: 'Not allowed' as const };
+  if (!hasPermission(s.role, 'members:invite')) return { error: 'Not allowed' as const };
   await prisma.invite.deleteMany({ where: { id: inviteId, tenantId: s.tenantId } });
   return { ok: true as const };
 }
 
 export async function bulkInvite(emails: string[], role: MembershipRole) {
   const s = await requireTenantSession();
-  if (!hasPermission(s.role, 'users:manage')) return { error: 'Not allowed' as const };
+  const denied = denyInvite(s.role, role);
+  if (denied) return { error: denied };
   const { hasSeatAvailable } = await import('@/lib/billing/entitlements');
   if (!(await hasSeatAvailable(s.tenantId))) return { error: 'Seat limit reached — upgrade your plan to invite more teammates' as const };
-  const cleaned = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => /.+@.+\..+/.test(e)))].slice(0, 50);
+  const cleaned = [...new Set(emails.map(normaliseInviteEmail).filter((e): e is string => e !== null))].slice(0, 50);
   const rl = await checkRateLimitDb(`invite:${s.tenantId}`, 100, 3_600_000);
   if (!rl.allowed) return { error: 'Invite rate limit reached, try later' as const };
+
+  const [tenant, inviter] = await Promise.all([
+    prisma.tenant.findUnique({ where: { id: s.tenantId }, select: { name: true } }),
+    prisma.user.findUnique({ where: { id: s.userId }, select: { email: true } }),
+  ]);
+
   let created = 0;
+  let emailed = 0;
   for (const email of cleaned) {
+    // Same shape as inviteUser(): a token so there's a link to send, and an expiry so an invite
+    // isn't a standing credential for an address that may have changed hands.
+    const token = randomBytes(18).toString('base64url');
+    const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86_400_000);
     try {
-      await prisma.invite.create({ data: { tenantId: s.tenantId, email, role, invitedByUserId: s.userId } });
+      await prisma.invite.create({
+        data: { tenantId: s.tenantId, email, role, invitedByUserId: s.userId, token, expiresAt },
+      });
       created++;
-    } catch { /* duplicate (tenantId,email) — skip */ }
+    } catch { continue; /* duplicate (tenantId,email) — skip */ }
+
+    // Non-fatal: the row is committed and the link stays valid, so a mail outage must not undo
+    // the invite. The count is returned so the wizard can say what actually went out.
+    const delivery = await sendInviteEmail({
+      to: email,
+      token,
+      role,
+      tenantName: tenant?.name ?? 'your workspace',
+      invitedByEmail: inviter?.email ?? 'A teammate',
+    });
+    if (delivery.sent) emailed++;
   }
-  return { created, skipped: cleaned.length - created };
+  return { created, emailed, skipped: cleaned.length - created };
 }

@@ -2,6 +2,7 @@ import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { listChannels, listMessages } from '@/actions/inbox';
 import { InboxWorkbench } from './inbox-workbench';
+import { prisma } from '@/lib/prisma';
 
 /**
  * Unified inbox (Stage 2). One triage surface for the exporter's inbound stream so nothing lives only in
@@ -15,7 +16,12 @@ export default async function InboxPage() {
   }
 
   const canWrite = hasPermission(role, 'inbox:write');
-  const [channels, messages] = await Promise.all([listChannels(tenantId), listMessages(tenantId)]);
+  const [channels, messages, shipments] = await Promise.all([
+    listChannels(), listMessages(),
+    canWrite && hasPermission(role, 'orders:write')
+      ? prisma.shipment.findMany({ where: { tenantId, status: { in: ['planning', 'booked', 'in_transit'] } }, select: { id: true, shipmentNumber: true }, orderBy: { createdAt: 'desc' }, take: 50 })
+      : Promise.resolve([]),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -27,7 +33,7 @@ export default async function InboxPage() {
         </p>
       </div>
 
-      <InboxWorkbench channels={channels} messages={messages} canWrite={canWrite} />
+      <InboxWorkbench channels={channels} messages={messages} canWrite={canWrite} shipments={shipments} />
     </div>
   );
 }

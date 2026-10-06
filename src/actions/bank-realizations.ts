@@ -5,8 +5,11 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
+import { derivedInvoiceBalance } from '@/lib/invoice-notes';
 
-export async function listBankRealizations(tenantId: string, invoiceId: string) {
+export async function listBankRealizations(invoiceId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'invoices:read')) throw new Error('You do not have permission to view this');
   return prisma.bankRealization.findMany({ where: { tenantId, invoiceId }, orderBy: { realizedAt: 'desc' } });
 }
 
@@ -17,8 +20,10 @@ async function syncInvoiceBalance(tenantId: string, invoiceId: string) {
   if (!invoice) return;
 
   const realized = invoice.bankRealizations.reduce((sum, r) => sum + r.realizedAmount, 0);
-  const balanceDue = Math.max(parseFloat((invoice.total - realized).toFixed(2)), 0);
-  const status = balanceDue <= 0.01 ? 'paid' : realized > 0 ? 'partially_paid' : invoice.status === 'paid' || invoice.status === 'partially_paid' ? 'sent' : invoice.status;
+  // Credit notes raised against this invoice reduce what is owed just as a payment does.
+  const credited = (await prisma.invoice.aggregate({ where: { tenantId, originalInvoiceId: invoiceId, noteKind: 'credit', status: { not: 'void' } }, _sum: { total: true } }))._sum.total ?? 0;
+  const { balanceDue, paid, settledAmount } = derivedInvoiceBalance({ total: invoice.total, realized, credited });
+  const status = paid ? 'paid' : settledAmount > 0 ? 'partially_paid' : invoice.status === 'paid' || invoice.status === 'partially_paid' ? 'sent' : invoice.status;
 
   await prisma.invoice.update({ where: { id: invoiceId }, data: { balanceDue, status } }); // tenant-safe: invoiceId verified tenant-owned via findFirst above
 }
@@ -100,7 +105,9 @@ export async function deleteBankRealization(realizationId: string) {
  * first. `balanceDue` is kept in sync with realizations by `syncInvoiceBalance`,
  * so it's the same figure the dashboard and founder brief already read.
  */
-export async function unreconciledInvoices(tenantId: string) {
+export async function unreconciledInvoices() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'invoices:read')) throw new Error('You do not have permission to view this');
   return prisma.invoice.findMany({
     where: { tenantId, isCreditOrDebitNote: false, status: { not: 'draft' }, balanceDue: { gt: 0.01 } },
     include: { bankRealizations: true },

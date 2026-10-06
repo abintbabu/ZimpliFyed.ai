@@ -6,7 +6,9 @@ import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 
-export async function listVendors(tenantId: string) {
+export async function listVendors() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'vendors:read')) throw new Error('You do not have permission to view this');
   return prisma.vendor.findMany({
     where: { tenantId },
     include: { rates: { include: { tiers: true } } },
@@ -14,7 +16,9 @@ export async function listVendors(tenantId: string) {
   });
 }
 
-export async function getVendor(tenantId: string, vendorId: string) {
+export async function getVendor(vendorId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'vendors:read')) throw new Error('You do not have permission to view this');
   return prisma.vendor.findFirst({
     where: { id: vendorId, tenantId },
     include: { rates: { include: { tiers: true } } },

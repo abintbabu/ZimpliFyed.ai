@@ -1,3 +1,7 @@
+import { FreightComparisonPanel } from '@/components/freight-comparison-panel';
+import { latestRates } from '@/lib/fx';
+import { prisma } from '@/lib/prisma';
+import { EntityDocuments } from '@/components/entity-documents';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireTenantSession } from '@/lib/session-tenant';
@@ -14,8 +18,9 @@ export default async function ShipmentDetailPage({ params }: { params: Promise<{
     return <p className="text-sm text-muted">You do not have access to shipments.</p>;
   }
 
-  const shipment = await getShipment(tenantId, id);
+  const shipment = await getShipment(id);
   if (!shipment) notFound();
+  const fxSnapshots = await prisma.fxSnapshot.findMany({ where: { tenantId }, orderBy: { asOf: 'desc' }, take: 200 });
   const canWrite = hasPermission(role, 'orders:write');
 
   return (
@@ -77,6 +82,17 @@ export default async function ShipmentDetailPage({ params }: { params: Promise<{
         defaultMode={shipment.mode}
         quotes={shipment.freightQuotes.map((q) => ({ id: q.id, forwarderName: q.forwarderName, mode: q.mode, currency: q.currency, amount: q.amount, transitDays: q.transitDays, validTo: q.validTo?.toISOString().slice(0, 10) ?? null, status: q.status }))}
       />
+
+      <FreightComparisonPanel
+        quotes={shipment.freightQuotes.map((q) => ({ id: q.id, forwarderName: q.forwarderName, mode: q.mode, currency: q.currency, amount: q.amount, transitDays: q.transitDays, validTo: q.validTo?.toISOString().slice(0, 10) ?? null, status: q.status }))}
+        mode={shipment.mode}
+        cbm={shipment.containers.reduce((s, c) => s + (c.cbm ?? 0), 0) || null}
+        weightKg={shipment.containers.reduce((s, c) => s + (c.grossWeightKg ?? 0), 0) || null}
+        rates={latestRates(fxSnapshots)}
+        currencies={[...new Set([...shipment.freightQuotes.map((q) => q.currency.toUpperCase()), 'USD', 'INR'])]}
+      />
+
+      <EntityDocuments collection="shipments" documentId={id} canWrite={hasPermission(role, 'orders:write')} />
     </div>
   );
 }

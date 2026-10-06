@@ -7,11 +7,15 @@ import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import type { VendorRateMethod } from '@prisma/client';
 
-export async function listVendorRates(tenantId: string) {
+export async function listVendorRates() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'vendors:read')) throw new Error('You do not have permission to view this');
   return prisma.vendorRate.findMany({ where: { tenantId }, include: { tiers: true, vendor: true } });
 }
 
-export async function listVendorRatesByVendor(tenantId: string, vendorId: string) {
+export async function listVendorRatesByVendor(vendorId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'vendors:read')) throw new Error('You do not have permission to view this');
   return prisma.vendorRate.findMany({
     where: { tenantId, vendorId },
     include: { tiers: true },

@@ -1,4 +1,5 @@
 import type { DocContext } from './context';
+import { summarizePacking, type PackingCartonRow, type PackingTotals } from '@/lib/packing';
 import { amountInWords } from './num-to-words';
 
 /**
@@ -107,7 +108,9 @@ export type InvoiceBody = {
   gstExportUnderLut: boolean;
   lutValidTo?: string;
 };
-export type PackingBody = { lines: PackingLine[]; totalQuantity: number };
+/** `cartons` / `totals` are present only when the order carries carton packing data (M2); a body without
+ * them is the legacy quantity-only packing list and renders exactly as before. */
+export type PackingBody = { lines: PackingLine[]; totalQuantity: number; cartons?: PackingCartonRow[]; totals?: PackingTotals };
 export type OriginBody = { lines: PackingLine[]; countryOfOrigin: string; declaration: string };
 
 function round2(n: number): number {
@@ -171,7 +174,9 @@ function packingBody(ctx: DocContext): PackingBody {
     quantity: l.quantity,
   }));
   const totalQuantity = round2(lines.reduce((sum, l) => sum + l.quantity, 0));
-  return { lines, totalQuantity };
+  if (!ctx.packing?.length) return { lines, totalQuantity };
+  const { rows, totals } = summarizePacking(ctx.packing);
+  return { lines, totalQuantity, cartons: rows, totals };
 }
 
 /** Build one DocModel from context. `docNumber` is assigned by the numbering counter (numbering.ts).

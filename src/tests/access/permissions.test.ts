@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
-import { hasPermission, ROLE_PERMISSIONS, ROLE_LABELS } from '../../lib/permissions';
+import {
+  hasPermission,
+  ROLE_PERMISSIONS,
+  ROLE_LABELS,
+  ASSIGNABLE_ROLES,
+  OWNER_ROLES,
+  isAssignableRole,
+  isOwnerRole,
+} from '../../lib/permissions';
 import { slugify, isValidSlug, emailDomain, isFreeMailDomain, RESERVED_SLUGS } from '../../lib/slug';
 
 /**
@@ -62,6 +70,59 @@ assert.equal(hasPermission('ops_admin', 'expenses:write'), false);
 assert.equal(hasPermission('ops_admin', 'expenses:delete'), false);
 assert.equal(hasPermission('ops_admin', 'reports:pnl'), false, 'ops_admin excludes P&L');
 assert.equal(hasPermission('ops_admin', 'billing:manage'), false, 'ops_admin is not owner-tier');
+
+// ── Team-management permissions (the §6.2 split, now actually enforced) ───────
+// These three used to have zero enforcement sites: every privileged call checked the legacy
+// owner-only `users:manage`, so an Admin could not invite, remove or re-role anyone despite the
+// matrix granting it. src/actions/users.ts now checks these names.
+{
+  for (const perm of ['members:invite', 'members:remove', 'roles:assign'] as const) {
+    assert.equal(hasPermission('admin', perm), true, `admin should have ${perm}`);
+    assert.equal(hasPermission('ops_admin', perm), true, `ops_admin should have ${perm}`);
+    assert.equal(hasPermission('owner', perm), true, `owner should have ${perm}`);
+    assert.equal(hasPermission('sales', perm), false, `sales must not have ${perm}`);
+    assert.equal(hasPermission('viewer', perm), false, `viewer must not have ${perm}`);
+  }
+  // Admins manage the team but never the money — the owner boundary that makes the split worth having.
+  assert.equal(hasPermission('admin', 'billing:manage'), false);
+  assert.equal(hasPermission('admin', 'data:export'), true);
+  assert.equal(hasPermission('sales', 'data:export'), false, 'export is not a staff-wide capability');
+}
+
+// ── Assignable roles ─────────────────────────────────────────────────────────
+// The members screen used to offer every MembershipRole. Picking `customer` or `vendor` (both
+// zero-permission portal identities) silently locked a teammate out of the whole dashboard.
+{
+  assert.equal(isAssignableRole('customer'), false, 'portal identity, not a team role');
+  assert.equal(isAssignableRole('vendor'), false, 'portal identity, not a team role');
+  assert.equal(isAssignableRole('super_admin'), false, 'legacy owner alias being retired (§6.1)');
+  assert.equal(isAssignableRole('owner'), true);
+  assert.equal(isAssignableRole('viewer'), true);
+  assert.equal(isAssignableRole('ops_admin'), true);
+
+  // Every assignable role must grant at least one permission, or assigning it is a silent lockout.
+  for (const role of ASSIGNABLE_ROLES) {
+    assert.ok(ROLE_PERMISSIONS[role].length > 0, `${role} is assignable but grants nothing`);
+    assert.ok(ROLE_LABELS[role], `assignable role ${role} has no label`);
+  }
+}
+
+// ── Owner roles (last-owner guard input) ─────────────────────────────────────
+// ownerCount() in src/actions/users.ts counts memberships in exactly these roles, so anything
+// holding OWNER_ONLY must appear here or the guard could be walked around.
+{
+  assert.deepEqual([...OWNER_ROLES].sort(), ['owner', 'super_admin']);
+  assert.equal(isOwnerRole('owner'), true);
+  assert.equal(isOwnerRole('super_admin'), true);
+  assert.equal(isOwnerRole('admin'), false);
+  assert.equal(isOwnerRole('ops_admin'), false);
+
+  for (const role of Object.keys(ROLE_PERMISSIONS) as (keyof typeof ROLE_PERMISSIONS)[]) {
+    if (hasPermission(role, 'billing:manage')) {
+      assert.ok(isOwnerRole(role), `${role} holds billing:manage but is not in OWNER_ROLES`);
+    }
+  }
+}
 
 // Every role has a human label.
 for (const role of Object.keys(ROLE_PERMISSIONS) as (keyof typeof ROLE_PERMISSIONS)[]) {

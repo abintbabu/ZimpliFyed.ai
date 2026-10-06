@@ -70,6 +70,27 @@ function fixtures(): Fixture[] {
   out.push({ name: 'clean/pi+ci', models: buildSet(baseContext(), ['proforma_invoice', 'commercial_invoice']), expect: [] });
   out.push({ name: 'clean/single-quantity-line', models: buildSet({ ...baseContext(), lines: [baseContext().lines[0]] }, ALL), expect: [] });
 
+  // ── Carton packing data (M2) ──────────────────────────────────────────────
+  // Cartons that exactly cover the goods: 2000 towels = 40 × 50, 1500 towels = 30 × 50.
+  const cartonCtx = (): DocContext => ({
+    ...baseContext(),
+    packing: [
+      { description: 'Cotton bath towels 500 GSM', marks: 'AN/HAM/1-40', cartonCount: 40, qtyPerCarton: 50, netWeightKg: 18, grossWeightKg: 20, lengthCm: 60, widthCm: 40, heightCm: 40 },
+      { description: 'Cotton hand towels 400 GSM', marks: 'AN/HAM/41-70', cartonCount: 30, qtyPerCarton: 50, netWeightKg: 9, grossWeightKg: 10, lengthCm: 50, widthCm: 40, heightCm: 30 },
+    ],
+  });
+  out.push({ name: 'clean/with-carton-packing', models: buildSet(cartonCtx(), ALL), expect: [] });
+  {
+    const ctx = cartonCtx();
+    ctx.packing![0].grossWeightKg = 17; // gross 17 < net 18
+    out.push({ name: 'break/pl-gross-less-than-net', models: buildSet(ctx, ALL), expect: ['pl_gross_ge_net'] });
+  }
+  {
+    const ctx = cartonCtx();
+    ctx.packing![1].cartonCount = 29; // 1450 packed vs 1500 listed
+    out.push({ name: 'break/pl-packed-qty-short', models: buildSet(ctx, ALL), expect: ['pl_packed_qty_matches_goods'] });
+  }
+
   // ── Totals ────────────────────────────────────────────────────────────────
   {
     const m = clone(buildSet(baseContext(), ALL));
@@ -211,6 +232,19 @@ function modelAssertions(): { name: string; ok: boolean; detail: string }[] {
   if (lakh.type === 'commercial_invoice') {
     check('words/lakh-crore-grouping', lakh.body.totalInWords === 'Twenty Five Lakh Only', `got "${lakh.body.totalInWords}"`);
   }
+
+  // Carton packing totals reach the model, and the PL still carries no prices.
+  const packed = buildSet(
+    { ...ctx, packing: [{ description: 'Cotton bath towels 500 GSM', marks: 'M1', cartonCount: 40, qtyPerCarton: 50, netWeightKg: 18, grossWeightKg: 20, lengthCm: 60, widthCm: 40, heightCm: 40 }] },
+    ['packing_list'],
+  )[0];
+  if (packed.type === 'packing_list') {
+    check('packing/cartons-totals-gross', packed.body.totals?.grossWeightKg === 800, `got ${packed.body.totals?.grossWeightKg}`);
+    check('packing/cartons-totals-cbm', packed.body.totals?.cbm === 3.84, `got ${packed.body.totals?.cbm}`);
+    check('packing/cartons-range', packed.body.cartons?.[0].cartonRange === '1-40', `got ${packed.body.cartons?.[0].cartonRange}`);
+    check('packing/cartons-no-price-fields', !JSON.stringify(packed.body).includes('unitPrice'));
+  }
+  check('packing/legacy-has-no-cartons', pl.type === 'packing_list' && pl.body.cartons === undefined, 'a set without packing data must keep the quantity-only body');
 
   // A packing list carries no prices — leaking unit prices onto the document that travels with the cargo
   // is exactly the disclosure exporters ask us to prevent.

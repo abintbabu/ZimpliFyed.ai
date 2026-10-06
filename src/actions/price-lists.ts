@@ -5,7 +5,9 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 
-export async function listPriceLists(tenantId: string, buyerId?: string) {
+export async function listPriceLists(buyerId?: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'customers:read')) throw new Error('You do not have permission to view this');
   return prisma.priceList.findMany({
     where: { tenantId, ...(buyerId ? { buyerId } : {}) },
     include: { items: { include: { product: true } } },
@@ -13,7 +15,9 @@ export async function listPriceLists(tenantId: string, buyerId?: string) {
   });
 }
 
-export async function getPriceList(tenantId: string, priceListId: string) {
+export async function getPriceList(priceListId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'customers:read')) throw new Error('You do not have permission to view this');
   return prisma.priceList.findFirst({
     where: { id: priceListId, tenantId },
     include: { items: { include: { product: true } } },
@@ -75,7 +79,8 @@ export async function addPriceListItem(input: { priceListId: string; productId: 
 
 /** Finds the applicable unit price for a product from the buyer's active price lists (buyer-specific first, then market-wide). */
 export async function getPriceForBuyerProduct(buyerId: string, productId: string, incoterm: string) {
-  const { tenantId } = await requireTenantSession();
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'customers:read')) throw new Error('You do not have permission to view this');
   const item = await prisma.priceListItem.findFirst({
     where: {
       productId,

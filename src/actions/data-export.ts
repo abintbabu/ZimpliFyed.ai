@@ -14,8 +14,8 @@ const EXPORT_URL_TTL_SEC = 24 * 60 * 60;
  * (small enough for now — revisit with a background job if export time becomes a problem at scale) and returns
  * a 24h signed download link. Email delivery of the link is a follow-up (no email provider wired yet). */
 export async function requestDataExport(): Promise<{ url: string; expiresAt: string }> {
-  const session = await requireTenantSession();
-  if (!hasPermission(session.role, 'users:manage')) throw new Error('Only owners and admins can request a data export');
+  const session = await requireTenantSession({ allowSuspended: true });
+  if (!hasPermission(session.role, 'data:export')) throw new Error('You do not have permission to request a data export');
 
   const rl = await checkRateLimitDb(`data-export:${session.tenantId}`, 1, 24 * 60 * 60 * 1000);
   if (!rl.allowed) {

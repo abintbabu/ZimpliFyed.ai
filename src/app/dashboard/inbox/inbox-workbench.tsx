@@ -2,12 +2,14 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
+import { ShippingExtractPanel } from './shipping-extract-panel';
 import { useRouter } from 'next/navigation';
 import { Inbox, Plus, RefreshCw, Sparkles, Archive, ArrowUpRight, Mail } from 'lucide-react';
 import type { InboxChannelKind, InboxChannelStatus, InboxMessageStatus } from '@prisma/client';
 import {
   ingestMessage,
   createChannel,
+  connectChannelCredential,
   classifyNow,
   setMessageStatus,
   triageToLead,
@@ -67,10 +69,12 @@ export function InboxWorkbench({
   channels,
   messages,
   canWrite,
+  shipments = [],
 }: {
   channels: ChannelView[];
   messages: InboxMessageView[];
   canWrite: boolean;
+  shipments?: { id: string; shipmentNumber: string }[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -78,6 +82,7 @@ export function InboxWorkbench({
   const [tab, setTab] = useState<InboxMessageStatus>('unread');
   const [selectedId, setSelectedId] = useState<string | null>(messages[0]?.id ?? null);
   const [showConnect, setShowConnect] = useState(false);
+  const [credFor, setCredFor] = useState<string | null>(null);
   const [showCompose, setShowCompose] = useState(channels.length > 0);
 
   const visible = useMemo(() => messages.filter((m) => m.status === tab), [messages, tab]);
@@ -112,6 +117,11 @@ export function InboxWorkbench({
             <span className="font-medium text-ink">{c.name}</span>
             <span className="text-muted">· {c.kind}</span>
             {c.status === 'error' && <span className="text-danger">· error</span>}
+            {canWrite && c.kind === 'imap' && (
+              <button onClick={() => setCredFor((v) => (v === c.id ? null : c.id))} className="text-muted underline hover:text-ink">
+                credentials
+              </button>
+            )}
             {canWrite && (
               <button
                 onClick={() => run(() => syncChannel(c.id))}
@@ -133,6 +143,13 @@ export function InboxWorkbench({
           </button>
         )}
       </div>
+
+      {credFor && canWrite && (
+        <ImapCredentialForm
+          pending={pending}
+          onSubmit={(secret) => run(async () => { await connectChannelCredential({ channelId: credFor, secret }); setCredFor(null); })}
+        />
+      )}
 
       {showConnect && canWrite && <ConnectChannelForm pending={pending} onSubmit={(input) => run(() => createChannel(input))} />}
 
@@ -212,7 +229,11 @@ export function InboxWorkbench({
               onStatus={(status) => run(() => setMessageStatus(selected.id, status))}
               onDraftReply={() => run(() => draftInboxReplyAction(selected.id))}
             />
-          ) : (
+          ) : null}
+          {selected && canWrite ? (
+            <ShippingExtractPanel key={`ship-${selected.id}`} messageId={selected.id} shipments={shipments} />
+          ) : null}
+          {!selected && (
             <div className="rounded-2xl border border-line p-8 text-center text-sm text-muted">
               Select a message to view it.
             </div>
@@ -325,6 +346,31 @@ function MessageDetail({
   );
 }
 
+function ImapCredentialForm({ pending, onSubmit }: { pending: boolean; onSubmit: (secret: string) => void }) {
+  const [host, setHost] = useState('');
+  const [user, setUser] = useState('');
+  const [password, setPassword] = useState('');
+  const field = 'mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink';
+  return (
+    <div className="rounded-2xl border border-line bg-canvas p-4 dark:bg-surface">
+      <p className="mb-3 text-sm font-medium text-ink">IMAP credentials</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="text-xs text-muted">Host<input aria-label="IMAP host" value={host} onChange={(e) => setHost(e.target.value)} placeholder="imap.zoho.in" autoComplete="off" className={field} /></label>
+        <label className="text-xs text-muted">Username<input aria-label="IMAP username" value={user} onChange={(e) => setUser(e.target.value)} placeholder="sales@acme.com" autoComplete="off" className={field} /></label>
+        <label className="text-xs text-muted">App password<input aria-label="IMAP password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className={field} /></label>
+      </div>
+      <p className="mt-2 text-xs text-muted">Stored encrypted and never shown again. Use an app-specific password where your provider offers one. Mail is read-only — nothing is marked read, moved or deleted.</p>
+      <button
+        onClick={() => { onSubmit(JSON.stringify({ host: host.trim(), user: user.trim(), password })); setPassword(''); }}
+        disabled={pending || !host.trim() || !user.trim() || !password}
+        className="mt-3 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+      >
+        {pending ? 'Saving…' : 'Save credentials'}
+      </button>
+    </div>
+  );
+}
+
 function ConnectChannelForm({
   pending,
   onSubmit,
@@ -373,7 +419,13 @@ function ConnectChannelForm({
           />
         </label>
       </div>
-      {kind !== 'manual' && (
+      {kind === 'imap' && (
+        <p className="mt-2 text-xs text-muted">
+          Add the channel, then click <strong>credentials</strong> on its chip to enter the mailbox host, username and an
+          app password. Only IMAP over TLS (port 993) on a public host name is supported.
+        </p>
+      )}
+      {kind !== 'manual' && kind !== 'imap' && (
         <p className="mt-2 text-xs text-muted">
           Credentialed live sync for {kind} isn&apos;t connected yet — the channel is created now and starts
           pulling once its connector is enabled. You can still add messages by paste.

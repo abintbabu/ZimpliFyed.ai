@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
@@ -11,8 +12,7 @@ export default async function CashFlowPage() {
   if (!hasPermission(role, 'analytics:read')) redirect('/dashboard');
 
   const forecast = await buildCashFlowForecast(tenantId);
-  const primaryCurrency = forecast.receivablesCurrencies[0] ?? 'USD';
-  const mixedCurrencies = forecast.receivablesCurrencies.length > 1;
+  const primaryCurrency = forecast.reportingCurrency;
   const maxBucket = Math.max(1, ...forecast.buckets.map((b) => b.receivables));
 
   return (
@@ -22,9 +22,16 @@ export default async function CashFlowPage() {
         <p className="mt-1 text-sm text-muted">Expected inflows over the next six weeks, from invoice due dates and claimable incentives.</p>
       </div>
 
-      {mixedCurrencies && (
-        <div className="rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning">
-          Receivables span {forecast.receivablesCurrencies.join(', ')} — totals below are a simple sum, not FX-converted.
+      {forecast.converted && (
+        <div className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
+          Receivables span {forecast.receivablesCurrencies.join(', ')} — converted to {forecast.reportingCurrency} at your saved rates.{' '}
+          <Link href="/dashboard/settings/fx" className="text-brand hover:underline">Review rates</Link>
+        </div>
+      )}
+      {forecast.unconvertedCurrencies.length > 0 && (
+        <div role="alert" className="rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning">
+          No exchange rate for {forecast.unconvertedCurrencies.join(', ')} — those invoices are <strong>not included</strong> in the totals below.{' '}
+          <Link href="/dashboard/settings/fx" className="underline">Add a rate</Link>
         </div>
       )}
 

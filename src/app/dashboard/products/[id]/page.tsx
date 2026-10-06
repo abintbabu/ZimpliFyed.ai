@@ -2,15 +2,18 @@ import { notFound } from 'next/navigation';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { getProduct } from '@/actions/products';
+import { EntityDocuments } from '@/components/entity-documents';
+import { ProductLogisticsForm } from './product-logistics-form';
+import { VariantsPanel } from './variants-panel';
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'products:read')) {
     return <p className="text-sm text-muted">You do not have access to products.</p>;
   }
 
-  const product = await getProduct(tenantId, id);
+  const product = await getProduct(id);
   if (!product) notFound();
 
   return (
@@ -22,6 +25,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {product.description && <p className="text-sm text-ink-soft">{product.description}</p>}
+
+      <ProductLogisticsForm productId={product.id} canWrite={hasPermission(role, 'products:write')} product={product} />
+      <VariantsPanel productId={product.id} canWrite={hasPermission(role, 'products:write')} variants={product.variants} />
+      <EntityDocuments collection="products" documentId={product.id} canWrite={hasPermission(role, 'products:write')} />
 
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Price list entries</h2>

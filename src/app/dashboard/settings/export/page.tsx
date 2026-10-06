@@ -5,8 +5,8 @@ import { ExportRequestPanel } from './export-request-panel';
 export const metadata = { title: 'Export data' };
 
 export default async function DataExportPage() {
-  const session = await requireTenantSession();
-  if (!hasPermission(session.role, 'users:manage')) {
+  const session = await requireTenantSession({ allowSuspended: true });
+  if (!hasPermission(session.role, 'data:export')) {
     return <p className="text-sm text-muted">Only owners and admins can export workspace data.</p>;
   }
 

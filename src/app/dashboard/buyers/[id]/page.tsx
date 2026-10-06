@@ -1,3 +1,4 @@
+import { EntityDocuments } from '@/components/entity-documents';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireTenantSession } from '@/lib/session-tenant';
@@ -5,15 +6,16 @@ import { hasPermission } from '@/lib/permissions';
 import { getBuyer, listBuyerActivity } from '@/actions/buyers';
 import { NewContactForm } from './new-contact-form';
 import { ActivityPanel } from './activity-panel';
+import { MarginPolicyForm } from './margin-policy-form';
 
 export default async function BuyerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'customers:read')) {
     return <p className="text-sm text-muted">You do not have access to buyers.</p>;
   }
 
-  const [buyer, activities] = await Promise.all([getBuyer(tenantId, id), listBuyerActivity(tenantId, id)]);
+  const [buyer, activities] = await Promise.all([getBuyer(id), listBuyerActivity(id)]);
   if (!buyer) notFound();
 
   return (
@@ -24,6 +26,8 @@ export default async function BuyerDetailPage({ params }: { params: Promise<{ id
           {buyer.country ?? '—'} · {buyer.currencyDefault} · {buyer.paymentTermsDefault ?? 'no default terms'}
         </p>
       </div>
+
+      <MarginPolicyForm buyerId={buyer.id} minMarginPct={buyer.minMarginPct} targetMarginPct={buyer.targetMarginPct} canWrite={hasPermission(role, 'customers:write')} />
 
       <section>
         <div className="mb-3 flex items-center justify-between">
@@ -77,6 +81,8 @@ export default async function BuyerDetailPage({ params }: { params: Promise<{ id
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Activity</h2>
         <ActivityPanel buyerId={buyer.id} activities={activities} />
       </section>
+
+      <EntityDocuments collection="buyers" documentId={id} canWrite={hasPermission(role, 'customers:write')} />
     </div>
   );
 }

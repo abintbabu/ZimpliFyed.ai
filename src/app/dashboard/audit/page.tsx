@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/dashboard/empty-state';
 
 export default async function AuditPage() {
   const { tenantId, role } = await requireTenantSession();
-  if (!hasPermission(role, 'users:manage')) redirect('/dashboard');
+  if (!hasPermission(role, 'settings:manage')) redirect('/dashboard');
 
   const entries = await prisma.auditEntry.findMany({
     where: { tenantId },

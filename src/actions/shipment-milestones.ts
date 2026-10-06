@@ -9,7 +9,9 @@ import { writeDomainEvent } from '@/lib/domain-events';
 import { MILESTONE_LABELS } from '@/lib/shipment-milestones';
 import type { ShipmentMilestoneType } from '@prisma/client';
 
-export async function listShipmentMilestones(tenantId: string, orderId: string) {
+export async function listShipmentMilestones(orderId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'orders:read')) throw new Error('You do not have permission to view this');
   return prisma.shipmentMilestone.findMany({ where: { tenantId, orderId } });
 }
 

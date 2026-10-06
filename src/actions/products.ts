@@ -7,7 +7,9 @@ import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import type { Prisma } from '@prisma/client';
 
-export async function listProducts(tenantId: string) {
+export async function listProducts() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'products:read')) throw new Error('You do not have permission to view this');
   return prisma.product.findMany({
     where: { tenantId },
     include: { hsCode: true },
@@ -15,10 +17,12 @@ export async function listProducts(tenantId: string) {
   });
 }
 
-export async function getProduct(tenantId: string, productId: string) {
+export async function getProduct(productId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'products:read')) throw new Error('You do not have permission to view this');
   return prisma.product.findFirst({
     where: { id: productId, tenantId },
-    include: { hsCode: true, priceListItems: { include: { priceList: true } } },
+    include: { hsCode: true, priceListItems: { include: { priceList: true } }, variants: { orderBy: { createdAt: 'asc' } } },
   });
 }
 
@@ -67,7 +71,8 @@ export async function createProduct(input: {
 
 export async function updateProduct(
   productId: string,
-  input: Partial<{ name: string; description: string; uom: string; category: string; hsCodeId: string | null; active: boolean; specs: Record<string, unknown> }>,
+  input: Partial<{ name: string; description: string; uom: string; category: string; hsCodeId: string | null; active: boolean; specs: Record<string, unknown>;
+    lengthCm: number | null; widthCm: number | null; heightCm: number | null; netWeightKg: number | null; grossWeightKg: number | null; piecesPerCarton: number | null; reorderLevel: number | null }>,
 ) {
   const session = await requireTenantSession();
   const { tenantId, role } = session;
@@ -75,6 +80,15 @@ export async function updateProduct(
 
   const before = await prisma.product.findFirst({ where: { id: productId, tenantId } });
   if (!before) throw new Error('Product not found');
+
+  for (const k of ['lengthCm', 'widthCm', 'heightCm', 'netWeightKg', 'grossWeightKg', 'piecesPerCarton', 'reorderLevel'] as const) {
+    const v = input[k];
+    if (v != null && !(v > 0 || (k === 'reorderLevel' && v === 0))) throw new Error(`${k} must be above 0`);
+  }
+  if (input.piecesPerCarton != null && !Number.isInteger(input.piecesPerCarton)) throw new Error('Pieces per carton must be a whole number');
+  const net = input.netWeightKg ?? before.netWeightKg;
+  const gross = input.grossWeightKg ?? before.grossWeightKg;
+  if (net != null && gross != null && gross < net) throw new Error('Gross weight cannot be less than net weight');
 
   await prisma.product.update({
     where: { id: productId, tenantId },
@@ -92,5 +106,38 @@ export async function updateProduct(
   });
 
   revalidatePath('/dashboard/products');
+  revalidatePath(`/dashboard/products/${productId}`);
+}
+
+// ── Variants (V2) ────────────────────────────────────────────────────────────
+
+export async function addProductVariant(productId: string, input: { sku: string; name: string; attributes?: Record<string, string>; priceAdjust?: number }) {
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
+  if (!hasPermission(role, 'products:write')) throw new Error('You do not have permission to edit products');
+
+  const product = await prisma.product.findFirst({ where: { id: productId, tenantId }, select: { id: true, sku: true } });
+  if (!product) throw new Error('Product not found');
+  const sku = input.sku.trim();
+  const name = input.name.trim();
+  if (!sku || !name) throw new Error('A variant needs a SKU and a name');
+  if (await prisma.productVariant.findFirst({ where: { productId, sku }, select: { id: true } })) throw new Error(`Variant SKU ${sku} already exists on this product`);
+
+  const attributes = Object.fromEntries(Object.entries(input.attributes ?? {}).map(([k, v]) => [k.trim(), v.trim()]).filter(([k, v]) => k && v));
+  const variant = await prisma.productVariant.create({
+    data: { productId, sku, name, attributes, priceAdjust: Number.isFinite(input.priceAdjust) ? (input.priceAdjust as number) : 0 },
+  });
+  await writeAudit({ session, collection: 'products', documentId: productId, action: 'create', summary: `Added variant ${sku} to ${product.sku}`, after: { sku, name } });
+  revalidatePath(`/dashboard/products/${productId}`);
+  return variant;
+}
+
+export async function setProductVariantActive(productId: string, variantId: string, active: boolean) {
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
+  if (!hasPermission(role, 'products:write')) throw new Error('You do not have permission to edit products');
+  const product = await prisma.product.findFirst({ where: { id: productId, tenantId }, select: { id: true } });
+  if (!product) throw new Error('Product not found');
+  await prisma.productVariant.updateMany({ where: { id: variantId, productId }, data: { active } });
   revalidatePath(`/dashboard/products/${productId}`);
 }

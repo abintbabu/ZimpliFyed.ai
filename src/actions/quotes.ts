@@ -13,6 +13,8 @@ import {
   DEFAULT_EXPENSE_PCT,
   DEFAULT_MARGIN_PCT,
   MARGIN_FLOOR_PCT,
+  effectiveMarginFloor,
+  effectiveDefaultMargin,
 } from '@/lib/pricing-buildup';
 import type { QuoteStatus } from '@prisma/client';
 
@@ -26,24 +28,25 @@ type QuoteLineInput = {
   unitPrice: number;
 };
 
-function enforceMarginFloor(lines: { marginPct?: number; description: string }[], role: string, allowOverride?: boolean) {
-  const breach = lines.find((l) => l.marginPct != null && l.marginPct < MARGIN_FLOOR_PCT);
+function enforceMarginFloor(lines: { marginPct?: number; description: string }[], role: string, allowOverride?: boolean, floor: number = MARGIN_FLOOR_PCT) {
+  const breach = lines.find((l) => l.marginPct != null && l.marginPct < floor);
   if (!breach) return;
   const canOverride = allowOverride && (role === 'admin' || role === 'super_admin' || role === 'owner');
   if (!canOverride) {
     throw new Error(
-      `Line "${breach.description}" is priced at ${breach.marginPct}% margin, below the ${MARGIN_FLOOR_PCT}% floor. An admin must override to save this quote.`,
+      `Line "${breach.description}" is priced at ${breach.marginPct}% margin, below the ${floor}% floor. An admin must override to save this quote.`,
     );
   }
 }
 
-function buildLineTotals(lines: QuoteLineInput[]) {
+function buildLineTotals(lines: QuoteLineInput[], defaultMarginPct: number = DEFAULT_MARGIN_PCT) {
   const withDefaults = withDefaultExpenseMargin(
     lines.map(l => ({ ...l, lineTotal: parseFloat((l.quantity * l.unitPrice).toFixed(2)) })),
+    defaultMarginPct,
   ).map(l => ({
     ...l,
     expensePct: l.expensePct ?? DEFAULT_EXPENSE_PCT,
-    marginPct: l.marginPct ?? DEFAULT_MARGIN_PCT,
+    marginPct: l.marginPct ?? defaultMarginPct,
   }));
   const total = withDefaults.reduce((sum, l) => sum + l.lineTotal, 0);
   const marginPcts = withDefaults.map(l => l.marginPct).filter((m): m is number => m != null);
@@ -53,11 +56,15 @@ function buildLineTotals(lines: QuoteLineInput[]) {
   return { lines: withDefaults, total: parseFloat(total.toFixed(2)), overallMarginPct };
 }
 
-export async function listQuotes(tenantId: string) {
+export async function listQuotes() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'quotes:read')) throw new Error('You do not have permission to view this');
   return prisma.quote.findMany({ where: { tenantId }, include: { lines: true }, orderBy: { createdAt: 'desc' } });
 }
 
-export async function getQuote(tenantId: string, quoteId: string) {
+export async function getQuote(quoteId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'quotes:read')) throw new Error('You do not have permission to view this');
   return prisma.quote.findFirst({
     where: { id: quoteId, tenantId },
     include: { lines: true, buyer: true, parentQuote: true, revisions: { orderBy: { version: 'asc' } } },
@@ -76,8 +83,9 @@ export async function createQuote(input: {
   const { tenantId, role } = session;
   if (!hasPermission(role, 'quotes:write')) throw new Error('You do not have permission to create quotes');
 
-  const { lines, total, overallMarginPct } = buildLineTotals(input.lines);
-  enforceMarginFloor(lines, role, input.overrideMarginFloor);
+  const buyerPolicy = input.buyerId ? await prisma.buyer.findFirst({ where: { id: input.buyerId, tenantId }, select: { minMarginPct: true, targetMarginPct: true } }) : null;
+  const { lines, total, overallMarginPct } = buildLineTotals(input.lines, effectiveDefaultMargin(buyerPolicy?.targetMarginPct));
+  enforceMarginFloor(lines, role, input.overrideMarginFloor, effectiveMarginFloor(buyerPolicy?.minMarginPct));
 
   const quote = await prisma.quote.create({
     data: {
@@ -113,8 +121,9 @@ export async function updateQuoteLines(quoteId: string, lines: QuoteLineInput[],
   const before = await prisma.quote.findFirst({ where: { id: quoteId, tenantId } });
   if (!before) throw new Error('Quote not found');
 
-  const { lines: withTotals, total, overallMarginPct } = buildLineTotals(lines);
-  enforceMarginFloor(withTotals, role, overrideMarginFloor);
+  const buyerPolicy = before.buyerId ? await prisma.buyer.findFirst({ where: { id: before.buyerId, tenantId }, select: { minMarginPct: true, targetMarginPct: true } }) : null;
+  const { lines: withTotals, total, overallMarginPct } = buildLineTotals(lines, effectiveDefaultMargin(buyerPolicy?.targetMarginPct));
+  enforceMarginFloor(withTotals, role, overrideMarginFloor, effectiveMarginFloor(buyerPolicy?.minMarginPct));
 
   const quote = await prisma.$transaction(async (tx) => {
     await tx.quoteLineItem.deleteMany({ where: { quoteId } });

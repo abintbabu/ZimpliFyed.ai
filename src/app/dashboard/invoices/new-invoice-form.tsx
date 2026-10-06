@@ -30,12 +30,17 @@ function addDays(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+type NoteKindChoice = '' | 'credit' | 'debit';
+
 export function NewInvoiceForm({
   templates,
   orders,
+  invoices = [],
 }: {
   templates: TemplateOption[];
   orders: { id: string; orderNumber: string }[];
+  /** Ordinary (non-note) invoices a credit/debit note can be raised against. */
+  invoices?: { id: string; invoiceNumber: string; currency: string; total: number }[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -45,7 +50,9 @@ export function NewInvoiceForm({
   const [orderId, setOrderId] = useState('');
   const [currency, setCurrency] = useState('USD');
   const [dueDate, setDueDate] = useState('');
-  const [isCreditOrDebitNote, setIsCreditOrDebitNote] = useState(false);
+  const [noteKind, setNoteKind] = useState<NoteKindChoice>('');
+  const [originalInvoiceId, setOriginalInvoiceId] = useState('');
+  const [noteReason, setNoteReason] = useState('');
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
 
   const updateLine = (i: number, patch: Partial<Line>) =>
@@ -56,7 +63,7 @@ export function NewInvoiceForm({
     const t = templates.find((tpl) => tpl.id === id);
     if (!t) return;
     setCurrency(t.currency);
-    setIsCreditOrDebitNote(t.isCreditOrDebitNote);
+    setNoteKind(t.isCreditOrDebitNote ? 'credit' : '');
     setDueDate(t.dueDays != null ? addDays(t.dueDays) : '');
     setLines(
       t.lines.length
@@ -78,7 +85,9 @@ export function NewInvoiceForm({
     setOrderId('');
     setCurrency('USD');
     setDueDate('');
-    setIsCreditOrDebitNote(false);
+    setNoteKind('');
+    setOriginalInvoiceId('');
+    setNoteReason('');
     setLines([emptyLine()]);
   };
 
@@ -96,7 +105,9 @@ export function NewInvoiceForm({
           orderId: orderId || undefined,
           currency: currency || 'USD',
           dueDate: dueDate ? new Date(dueDate) : undefined,
-          isCreditOrDebitNote,
+          noteKind: noteKind || undefined,
+          originalInvoiceId: noteKind && originalInvoiceId ? originalInvoiceId : undefined,
+          noteReason: noteKind ? noteReason : undefined,
           lines: lines
             .filter((l) => l.description.trim())
             .map((l) => ({
@@ -226,10 +237,33 @@ export function NewInvoiceForm({
         + Add line
       </button>
 
-      <label className="flex items-center gap-2 text-xs text-muted">
-        <input type="checkbox" checked={isCreditOrDebitNote} onChange={(e) => setIsCreditOrDebitNote(e.target.checked)} />
-        This is a credit/debit note
-      </label>
+      <div className="space-y-2 rounded-lg border border-line p-3">
+        <label className="block text-xs text-muted">Document type
+          <select aria-label="Document type" value={noteKind} onChange={(e) => setNoteKind(e.target.value as NoteKindChoice)} className="mt-1 block w-full max-w-xs rounded-lg border border-line px-3 py-2 text-sm text-ink">
+            <option value="">Invoice</option>
+            <option value="credit">Credit note (reduces what the buyer owes)</option>
+            <option value="debit">Debit note (additional charge)</option>
+          </select>
+        </label>
+        {noteKind && (
+          <>
+            <label className="block text-xs text-muted">
+              {noteKind === 'credit' ? 'Invoice being credited (required)' : 'Related invoice (optional)'}
+              <select aria-label="Original invoice" value={originalInvoiceId} onChange={(e) => {
+                setOriginalInvoiceId(e.target.value);
+                const o = invoices.find((i) => i.id === e.target.value);
+                if (o) setCurrency(o.currency);
+              }} className="mt-1 block w-full max-w-md rounded-lg border border-line px-3 py-2 text-sm text-ink">
+                <option value="">{noteKind === 'credit' ? 'Select an invoice…' : 'None'}</option>
+                {invoices.map((i) => <option key={i.id} value={i.id}>{i.invoiceNumber} — {i.currency} {i.total.toFixed(2)}</option>)}
+              </select>
+            </label>
+            <label className="block text-xs text-muted">Reason (required)
+              <input aria-label="Note reason" value={noteReason} onChange={(e) => setNoteReason(e.target.value)} placeholder="e.g. Damaged goods, price correction" className="mt-1 block w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" />
+            </label>
+          </>
+        )}
+      </div>
 
       <div className="flex items-center gap-3">
         <button type="button" disabled={pending} onClick={submit} className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50">

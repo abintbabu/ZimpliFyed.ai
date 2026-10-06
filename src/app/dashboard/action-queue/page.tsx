@@ -11,7 +11,7 @@ export default async function ActionQueuePage() {
   const { tenantId, role } = await requireTenantSession();
   if (!hasPermission(role, 'action_queue:read')) redirect('/dashboard');
 
-  const [items, acceptance] = await Promise.all([listActionQueue(tenantId), actionAcceptanceStats(tenantId)]);
+  const [items, acceptance] = await Promise.all([listActionQueue(), actionAcceptanceStats(tenantId)]);
   const canApprove = hasPermission(role, 'action_queue:approve');
 
   const KIND_LABELS: Record<string, string> = {
@@ -22,6 +22,7 @@ export default async function ActionQueuePage() {
     send_quote: 'Quotes',
     chase_vendor: 'Vendor chases',
     delay_alert: 'Delay alerts',
+    lc_deadline: 'LC deadlines',
   };
   const readiness = acceptance
     .filter((s) => s.decided > 0)

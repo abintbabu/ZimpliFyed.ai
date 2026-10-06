@@ -3,6 +3,7 @@ import type { InboxChannelKind } from '@prisma/client';
 import { ProviderNotConfiguredError } from './types';
 import type { InboxProvider } from './types';
 import { gmailProvider } from './gmail';
+import { imapProvider } from './imap';
 
 // The contract lives in ./types (no connector imports) to keep registry→connector→contract acyclic;
 // re-exported here so existing `from '@/lib/inbox/provider'` imports keep working.
@@ -45,11 +46,11 @@ const PROVIDERS: Record<InboxChannelKind, InboxProvider> = {
   manual: manualProvider,
   // Gmail is a live, credentialed connector (fetch-based REST, OAuth refresh-token from the vault).
   gmail: gmailProvider,
-  // Remaining credentialed connectors — same interface, wired as each integration lands. `imap` needs a TCP
-  // client library; `whatsapp` is webhook-native (Meta Cloud API pushes inbound), so it is fed via its
+  // Remaining credentialed connectors — same interface, wired as each integration lands. `whatsapp` is webhook-native (Meta Cloud API pushes inbound), so it is fed via its
   // webhook route into ingestMessage rather than pulled here. `email` is the generic forwarding alias.
   email: stubProvider('email'),
-  imap: stubProvider('imap'),
+  // Generic IMAP over TLS (Zoho / Outlook / cPanel / custom domains) — see imap.ts for the SSRF guard.
+  imap: imapProvider,
   whatsapp: stubProvider('whatsapp'),
 };
 

@@ -1,3 +1,4 @@
+import { EntityDocuments } from '@/components/entity-documents';
 import { notFound } from 'next/navigation';
 import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
@@ -15,11 +16,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     return <p className="text-sm text-muted">You do not have access to invoices.</p>;
   }
 
-  const invoice = await getInvoice(tenantId, id);
+  const invoice = await getInvoice(id);
   if (!invoice) notFound();
 
   const order = invoice.orderId ? await prisma.order.findFirst({ where: { id: invoice.orderId, tenantId }, include: { quote: true } }) : null;
-  const realizations = invoice.isCreditOrDebitNote ? [] : await listBankRealizations(tenantId, invoice.id);
+  const realizations = invoice.isCreditOrDebitNote ? [] : await listBankRealizations(invoice.id);
 
   return (
     <div className="space-y-6">
@@ -50,6 +51,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           initial={realizations}
         />
       )}
+
+      <EntityDocuments collection="invoices" documentId={id} canWrite={hasPermission(role, 'invoices:write')} />
     </div>
   );
 }

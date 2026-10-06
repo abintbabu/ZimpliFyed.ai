@@ -7,7 +7,9 @@ import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import type { LeadStage } from '@prisma/client';
 
-export async function listLeads(tenantId: string) {
+export async function listLeads() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'leads:read')) throw new Error('You do not have permission to view this');
   return prisma.lead.findMany({
     where: { tenantId },
     orderBy: { createdAt: 'desc' },

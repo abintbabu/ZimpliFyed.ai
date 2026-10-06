@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from './prisma';
+import { latestRates, planReporting } from './fx';
 
 export type CashFlowBucket = {
   label: string;
@@ -15,6 +16,12 @@ export type CashFlowForecast = {
   scheduledReceivablesTotal: number;
   /** Distinct invoice currencies feeding the receivables figures — if more than one, the totals mix currencies without FX conversion, so callers should flag that instead of presenting a single clean number. */
   receivablesCurrencies: string[];
+  /** Currency every receivables figure above is expressed in: the single invoice currency, or the base currency when several are converted. */
+  reportingCurrency: string;
+  /** True when amounts were FX-converted into `reportingCurrency`. */
+  converted: boolean;
+  /** Currencies with open balances but no exchange rate — NOT included in the totals. */
+  unconvertedCurrencies: string[];
   /** INR — export incentive schemes are government-disbursed in INR regardless of invoice currency, so kept separate rather than summed into receivables. */
   incentivesPipeline: number;
 };
@@ -37,15 +44,19 @@ export async function buildCashFlowForecast(tenantId: string): Promise<CashFlowF
   const now = new Date();
   const horizonEnd = new Date(now.getTime() + BUCKET_COUNT * WEEK_MS);
 
-  const [openInvoices, claimableIncentives] = await Promise.all([
+  const [openInvoices, claimableIncentives, fxSnapshots] = await Promise.all([
     prisma.invoice.findMany({
       where: { tenantId, isDemo: false, isCreditOrDebitNote: false, balanceDue: { gt: 0.01 } },
     }),
     prisma.incentiveClaim.findMany({ where: { tenantId, status: 'claimable' } }).catch(() => []),
+    prisma.fxSnapshot.findMany({ where: { tenantId }, orderBy: { asOf: 'desc' }, take: 200 }).catch(() => []),
   ]);
 
+  const plan = planReporting(openInvoices.map((i) => i.currency), latestRates(fxSnapshots));
+  const inReporting = (i: { balanceDue: number; currency: string }) => plan.convert(i.balanceDue, i.currency) ?? 0;
+
   const overdue = openInvoices.filter((i) => i.dueDate && i.dueDate < now);
-  const overdueReceivables = parseFloat(overdue.reduce((s, i) => s + i.balanceDue, 0).toFixed(2));
+  const overdueReceivables = parseFloat(overdue.reduce((s, i) => s + inReporting(i), 0).toFixed(2));
 
   const buckets: CashFlowBucket[] = Array.from({ length: BUCKET_COUNT }, (_, i) => {
     const from = new Date(now.getTime() + i * WEEK_MS);
@@ -56,7 +67,7 @@ export async function buildCashFlowForecast(tenantId: string): Promise<CashFlowF
   for (const invoice of openInvoices) {
     if (!invoice.dueDate || invoice.dueDate < now || invoice.dueDate >= horizonEnd) continue;
     const bucket = buckets.find((b) => invoice.dueDate! >= b.from && invoice.dueDate! < b.to);
-    if (bucket) bucket.receivables = parseFloat((bucket.receivables + invoice.balanceDue).toFixed(2));
+    if (bucket) bucket.receivables = parseFloat((bucket.receivables + inReporting(invoice)).toFixed(2));
   }
 
   const incentivesPipeline = parseFloat(
@@ -68,5 +79,15 @@ export async function buildCashFlowForecast(tenantId: string): Promise<CashFlowF
   );
   const receivablesCurrencies = [...new Set(openInvoices.map((i) => i.currency))];
 
-  return { asOf: now, overdueReceivables, buckets, scheduledReceivablesTotal, receivablesCurrencies, incentivesPipeline };
+  return {
+    asOf: now,
+    overdueReceivables,
+    buckets,
+    scheduledReceivablesTotal,
+    receivablesCurrencies,
+    reportingCurrency: plan.reportingCurrency,
+    converted: plan.converted,
+    unconvertedCurrencies: plan.unconverted,
+    incentivesPipeline,
+  };
 }

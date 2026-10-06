@@ -7,7 +7,9 @@ import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { classifyHsCode } from '@/lib/ai/hs-classification';
 
-export async function listHsCodes(tenantId: string) {
+export async function listHsCodes() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'hs_codes:read')) throw new Error('You do not have permission to view this');
   return prisma.hsCode.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' }, take: 50 });
 }
 

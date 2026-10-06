@@ -1,4 +1,5 @@
 import { computeLandedCost } from '@/lib/landed-cost';
+import { signedInvoiceTotal } from '@/lib/invoice-notes';
 import type { CostCategory } from '@prisma/client';
 
 export type OrderPnlInput = {
@@ -12,7 +13,7 @@ export type OrderPnlInput = {
     rodtepPct: number;
     lines: { category: CostCategory; amountPerUnit: number }[];
   } | null;
-  invoices: { total: number; isCreditOrDebitNote: boolean }[];
+  invoices: { total: number; isCreditOrDebitNote: boolean; noteKind?: 'credit' | 'debit' | null }[];
   incentiveAmounts: number[]; // claimed or received incentive claim amounts for this order
   bookedExpenses: number[]; // auto-posted/approved snapped expenses attributed to this order (Sprint 4)
 };
@@ -40,9 +41,9 @@ export function computeOrderPnl(input: OrderPnlInput): OrderPnlResult {
   const quotedCost = input.quote?.lines.reduce((sum, l) => sum + l.cost * l.quantity, 0) ?? 0;
   const quotedMarginPct = quotedRevenue > 0 ? parseFloat((((quotedRevenue - quotedCost) / quotedRevenue) * 100).toFixed(2)) : null;
 
-  const actualRevenue = input.invoices
-    .filter((i) => !i.isCreditOrDebitNote)
-    .reduce((sum, i) => sum + i.total, 0);
+  // Invoices and debit notes add, credit notes subtract (see invoice-notes.ts) — a credited order did not
+  // earn its full invoiced value.
+  const actualRevenue = input.invoices.reduce((sum, i) => sum + signedInvoiceTotal(i), 0);
 
   const incentiveCredits = input.incentiveAmounts.reduce((sum, a) => sum + a, 0);
   const bookedExpenses = input.bookedExpenses.reduce((sum, a) => sum + a, 0);

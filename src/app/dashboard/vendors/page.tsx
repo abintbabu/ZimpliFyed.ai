@@ -11,13 +11,13 @@ import { NewVendorForm } from './new-vendor-form';
 type Vendor = Awaited<ReturnType<typeof listVendors>>[number];
 
 export default async function VendorsPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'vendors:read')) {
     return <p className="text-sm text-muted">You do not have access to vendors.</p>;
   }
 
   const canWrite = hasPermission(role, 'vendors:write');
-  const vendors = await listVendors(tenantId);
+  const vendors = await listVendors();
 
   const columns: DataTableColumn<Vendor>[] = [
     {

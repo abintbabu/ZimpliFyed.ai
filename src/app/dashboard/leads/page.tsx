@@ -7,14 +7,14 @@ import { NewLeadForm } from './new-lead-form';
 import { PasteEnquiryBox } from './paste-enquiry-box';
 
 export default async function LeadsPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'leads:read')) {
     return <p className="text-sm text-muted">You do not have access to leads.</p>;
   }
 
   const canWrite = hasPermission(role, 'leads:write');
   const canQuote = hasPermission(role, 'quotes:write');
-  const leads = await listLeads(tenantId);
+  const leads = await listLeads();
 
   return (
     <div className="space-y-6">

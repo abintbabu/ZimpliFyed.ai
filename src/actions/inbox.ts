@@ -8,6 +8,8 @@ import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { enqueue } from '@/lib/jobs/queue';
 import { storeCredential } from '@/lib/crypto/vault';
+import { parseImapCredential } from '@/lib/inbox/imap';
+import { validateImapHost } from '@/lib/inbox/imap-safety';
 import { syncChannelCore } from '@/lib/inbox/sync';
 import { runInboxIngest } from '@/lib/inbox/ingest';
 import { draftQuoteFromEnquiry } from '@/actions/enquiry';
@@ -33,7 +35,9 @@ export type InboxMessageView = {
   linkedEntityId: string | null;
 };
 
-export async function listChannels(tenantId: string) {
+export async function listChannels() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'inbox:read')) throw new Error('You do not have permission to view this');
   return prisma.inboxChannel.findMany({
     where: { tenantId },
     orderBy: { createdAt: 'asc' },
@@ -41,7 +45,9 @@ export async function listChannels(tenantId: string) {
   });
 }
 
-export async function listMessages(tenantId: string, status?: InboxMessageStatus): Promise<InboxMessageView[]> {
+export async function listMessages(status?: InboxMessageStatus): Promise<InboxMessageView[]> {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'inbox:read')) throw new Error('You do not have permission to view this');
   const rows = await prisma.inboxMessage.findMany({
     where: { tenantId, ...(status ? { status } : {}) },
     orderBy: { receivedAt: 'desc' },
@@ -66,7 +72,9 @@ export async function listMessages(tenantId: string, status?: InboxMessageStatus
 }
 
 /** Unread count for the sidebar badge. */
-export async function countUnread(tenantId: string): Promise<number> {
+export async function countUnread(): Promise<number> {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'inbox:read')) throw new Error('You do not have permission to view this');
   return prisma.inboxMessage.count({ where: { tenantId, status: 'unread' } });
 }
 
@@ -117,6 +125,12 @@ export async function connectChannelCredential(input: { channelId: string; secre
   });
   if (!channel) throw new Error('Unknown channel');
   if (channel.kind === 'manual') throw new Error('The manual channel has no credential to connect');
+  if (channel.kind === 'imap') {
+    // Reject a private-network / non-TLS target at save time with a clear message, not as a sync error later.
+    const cred = parseImapCredential(secret);
+    const problem = validateImapHost(cred.host);
+    if (problem) throw new Error(problem);
+  }
 
   await storeCredential({ tenantId: session.tenantId, kind: channel.kind, account: channel.account, secret });
   // A freshly (re)connected channel clears any prior error so the next sync is attempted cleanly.

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
+import { isInviteUsable } from '@/lib/team-guards';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,10 +26,9 @@ export default async function JoinTokenPage({
     include: { tenant: { select: { name: true } } },
   });
 
-  const invalid =
-    !invite ||
-    (invite.expiresAt && invite.expiresAt < new Date()) ||
-    (invite.maxUses != null && invite.useCount >= invite.maxUses);
+  // Same liveness rule the redemption path uses, so the page can't say "valid" for a token that
+  // resolvePostAuthDestination() will then silently refuse.
+  const invalid = !invite || !isInviteUsable(invite);
 
   if (invalid) {
     return (

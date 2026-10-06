@@ -11,7 +11,9 @@ import { buildExportDocumentData, EXPORT_DOCUMENT_LABELS, type ExportDocumentDat
 import { checkDocumentConsistency } from '@/lib/ai/document-consistency';
 import type { ExportDocumentType } from '@prisma/client';
 
-export async function listExportDocuments(tenantId: string, orderId: string) {
+export async function listExportDocuments(orderId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'orders:read')) throw new Error('You do not have permission to view this');
   const docs = await prisma.exportDocument.findMany({
     where: { tenantId, orderId },
     orderBy: [{ type: 'asc' }, { version: 'desc' }],
@@ -87,7 +89,7 @@ export async function runDocumentConsistencyCheck(orderId: string) {
   const { tenantId, userId } = session;
   if (!hasPermission(session.role, 'orders:read')) throw new Error('You do not have permission to view this order');
 
-  const docs = await listExportDocuments(tenantId, orderId);
+  const docs = await listExportDocuments(orderId);
   const latestByType = new Map<ExportDocumentType, (typeof docs)[number]>();
   for (const d of docs) {
     if (!latestByType.has(d.type)) latestByType.set(d.type, d);

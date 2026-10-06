@@ -24,7 +24,9 @@ export type ExpenseRow = {
 };
 
 /** List a tenant's expenses, most recent first — the review queue plus the booked history. */
-export async function listExpenses(tenantId: string): Promise<ExpenseRow[]> {
+export async function listExpenses(): Promise<ExpenseRow[]> {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'expenses:read')) throw new Error('You do not have permission to view this');
   const rows = await prisma.expense.findMany({
     where: { tenantId },
     orderBy: { createdAt: 'desc' },

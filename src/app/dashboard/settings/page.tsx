@@ -7,10 +7,10 @@ import { TenantProfileForm } from './tenant-profile-form';
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
-  const { tenantId, role } = await requireTenantSession();
-  const canManage = hasPermission(role, 'users:manage');
+  const { role } = await requireTenantSession();
+  const canManage = hasPermission(role, 'settings:manage');
 
-  const profile = await getTenantProfile(tenantId);
+  const profile = await getTenantProfile();
   if (!profile) return <p className="text-sm text-muted">Company not found.</p>;
 
   return (
@@ -36,6 +36,9 @@ export default async function SettingsPage() {
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <Link href="/dashboard/users" className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-black/[0.02]">
             Manage team &amp; roles
+          </Link>
+          <Link href="/dashboard/settings/fx" className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-black/[0.02]">
+            Exchange rates
           </Link>
           <Link href="/dashboard/settings/billing" className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-black/[0.02]">
             Billing &amp; plan

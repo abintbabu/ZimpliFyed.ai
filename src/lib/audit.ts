@@ -4,8 +4,13 @@ import type { AuditAction, MembershipRole, Prisma } from '@prisma/client';
 import type { TenantSession } from '@/lib/session-tenant';
 import { auth } from '@/auth';
 
+/** The parts of a TenantSession an audit entry attributes to. Narrower than TenantSession so
+ * callers that synthesise an actor (e.g. the doc-engine issue transaction) don't have to invent
+ * fields the audit trail never reads. */
+export type AuditActor = Pick<TenantSession, 'tenantId' | 'userId' | 'role'>;
+
 type WriteAuditInput = {
-  session: TenantSession;
+  session: AuditActor;
   collection: string;
   documentId: string;
   action: AuditAction;

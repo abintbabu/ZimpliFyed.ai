@@ -15,13 +15,13 @@ const STATUS_LABEL: Record<string, string> = { open: 'Open', awarded: 'Awarded',
 type Rfq = Awaited<ReturnType<typeof listVendorRfqs>>[number];
 
 export default async function VendorRfqsPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'vendors:read')) {
     return <p className="text-sm text-muted">You do not have access to RFQs.</p>;
   }
 
   const canWrite = hasPermission(role, 'vendors:write');
-  const [rfqs, vendors] = await Promise.all([listVendorRfqs(tenantId), listVendors(tenantId)]);
+  const [rfqs, vendors] = await Promise.all([listVendorRfqs(), listVendors()]);
 
   const columns: DataTableColumn<Rfq>[] = [
     {

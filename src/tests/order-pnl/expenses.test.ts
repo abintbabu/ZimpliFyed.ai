@@ -37,4 +37,24 @@ function base(): OrderPnlInput {
   assert.equal(r.actualMarginPct, null);
 }
 
-console.log('✓ order-pnl: booked expenses reduce actual margin (3 cases pass)');
+// A credit note reduces actual revenue: 10000 invoiced − 2000 credited = 8000; cost 6000 → 25%.
+{
+  const r = computeOrderPnl({
+    ...base(),
+    invoices: [{ total: 10000, isCreditOrDebitNote: false }, { total: 2000, isCreditOrDebitNote: true, noteKind: 'credit' }],
+  });
+  assert.equal(r.actualRevenue, 8000);
+  assert.equal(r.actualMarginPct, 25);
+}
+
+// A debit note adds: 10000 + 1000 = 11000; cost 6000 → ≈45.45%.
+{
+  const r = computeOrderPnl({
+    ...base(),
+    invoices: [{ total: 10000, isCreditOrDebitNote: false }, { total: 1000, isCreditOrDebitNote: true, noteKind: 'debit' }],
+  });
+  assert.equal(r.actualRevenue, 11000);
+  assert.equal(r.actualMarginPct, 45.45);
+}
+
+console.log('✓ order-pnl: booked expenses and credit/debit notes (5 cases pass)');

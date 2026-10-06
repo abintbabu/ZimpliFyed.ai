@@ -145,6 +145,18 @@ model Tenant {
   domains             TenantDomain[]
   supportAccessGrants SupportAccessGrant[]
   numberingSeries     NumberingSeries[]
+  fxSnapshots         FxSnapshot[]
+  forwarders          Forwarder[]
+  goodsReceipts       GoodsReceipt[]
+  stockItems          StockItem[]
+  stockMovements      StockMovement[]
+  vendorBills         VendorBill[]
+  vendorPayments      VendorPayment[]
+  bankStatementLines  BankStatementLine[]
+  importEntries       ImportEntry[]
+  productionRuns      ProductionRun[]
+  qcInspections       QcInspection[]
+  purchaseOrders      PurchaseOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -369,6 +381,8 @@ model Vendor {
   rates      VendorRate[]
   rfqInvites VendorRfqInvite[]
   rfqQuotes  VendorRfqQuote[]
+  purchaseOrders PurchaseOrder[]
+  vendorBills    VendorBill[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -383,6 +397,10 @@ model VendorRate {
 
   vendorId String
   vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  /// Optional catalogue link (V2) — replaces matching on the free-text sku.
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   sku         String
   description String?
@@ -457,6 +475,10 @@ model VendorRfqInvite {
   vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   invitedAt DateTime @default(now())
+
+  /// Vendor portal (V2): unguessable single-use-per-vendor link, no login.
+  token          String?   @unique
+  tokenExpiresAt DateTime?
 
   @@unique([rfqId, vendorId])
   @@index([rfqId])
@@ -575,6 +597,9 @@ enum CostCategory {
   finance_cost
   duties
   other
+  commission
+  bank_charges
+  documentation
 }
 
 model CostSheet {
@@ -621,6 +646,11 @@ enum InvoiceStatus {
   void
 }
 
+enum InvoiceNoteKind {
+  credit
+  debit
+}
+
 model Invoice {
   id       String  @id @default(cuid())
   tenantId String
@@ -637,6 +667,10 @@ model Invoice {
   balanceDue          Float     @default(0)
   dueDate             DateTime?
   isCreditOrDebitNote Boolean   @default(false)
+  /// Expand phase: typed replacement for isCreditOrDebitNote (kept and dual-written until contract).
+  noteKind          InvoiceNoteKind?
+  originalInvoiceId String?
+  noteReason        String?
 
   lines             InvoiceLineItem[]
   bankRealizations  BankRealization[]
@@ -749,7 +783,11 @@ model Order {
   destination String?
   originPort  String?
   destPort    String?
+  /// Order currency. Null on legacy rows — the doc engine then falls back to the quote's currency.
+  currency    String?
 
+  lines              OrderLineItem[]
+  packingEntries     PackingEntry[]
   quote              Quote?
   invoices           Invoice[]
   buyerTracks        OrderBuyerTrack[]
@@ -1090,12 +1128,19 @@ enum ComplianceCategory {
   bis
   buyer_cert
   other
+  coo
+  phytosanitary
+  fumigation
+  inspection
 }
 
 model ComplianceItem {
   id       String @id @default(cuid())
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Certificate registry (V2): a per-shipment certificate (COO, phyto, fumigation…) links to its order.
+  orderId String?
 
   category         ComplianceCategory
   name             String
@@ -1177,6 +1222,17 @@ model ScreeningCheck {
 
 // ─── LC advisor (AI review of draft LC terms vs the order) ───────────────
 
+enum LcStatus {
+  draft
+  advised
+  amended
+  documents_presented
+  accepted
+  paid
+  expired
+  cancelled
+}
+
 model LetterOfCredit {
   id       String @id @default(cuid())
   tenantId String
@@ -1188,6 +1244,16 @@ model LetterOfCredit {
   lcNumber    String?
   issuingBank String?
   rawText     String
+
+  // Structured terms (M3) — all optional so legacy text-only rows stay valid.
+  amount             Float?
+  currency           String?
+  expiryDate         DateTime?
+  latestShipmentDate DateTime?
+  requiredDocuments  Json?
+  status             LcStatus @default(draft)
+  /// Set by the LC deadline sweep when an alert is emitted (re-alerts only when a deadline moves).
+  lastAlertedAt      DateTime?
 
   // AI review output — null until reviewed.
   workable      Boolean?
@@ -1337,6 +1403,9 @@ model Buyer {
   taxIds  Json?
 
   paymentTermsDefault String?
+  /// Per-buyer margin policy (V2). Null = fall back to the global floor/default.
+  minMarginPct        Float?
+  targetMarginPct     Float?
   currencyDefault     String  @default("USD")
   creditLimit         Float?
 
@@ -1427,9 +1496,21 @@ model Product {
 
   specs  Json?
   photos String[]
+  /// Carton/product dimensions and weights (V2) — feed the loadability planner.
+  lengthCm       Float?
+  widthCm        Float?
+  heightCm       Float?
+  netWeightKg    Float?
+  grossWeightKg  Float?
+  piecesPerCarton Int?
+  reorderLevel   Float?
+  variants       ProductVariant[]
+  vendorRates    VendorRate[]
+  stockItems     StockItem[]
   active Boolean  @default(true)
 
   priceListItems PriceListItem[]
+  orderLines     OrderLineItem[]
   quoteLines     QuoteLineItem[]
   invoiceLines   InvoiceLineItem[]
 
@@ -1551,6 +1632,7 @@ enum ActionKind {
   delay_alert
   send_whatsapp_template
   reply_inbox_message
+  lc_deadline
 }
 
 enum ActionQueueStatus {
@@ -2198,6 +2280,13 @@ model FreightQuote {
   shipmentId String
   shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
+  forwarderId String?
+  forwarder   Forwarder? @relation(fields: [forwarderId], references: [id], onDelete: SetNull)
+
+  /// Chargeable basis for per-unit comparison (V2).
+  cbm      Float?
+  weightKg Float?
+
   forwarderName String
   mode          ShipmentMode
   currency      String       @default("USD")
@@ -2211,4 +2300,521 @@ model FreightQuote {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, shipmentId])
+}
+
+
+// ─── Order lines & packing (M1, M2) ──────────────────────────────────────────
+
+/// Pure child of Order (QuoteLineItem pattern — no tenantId, scope inherited through the parent).
+model OrderLineItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  description String
+  hsCode      String?
+  quantity    Float
+  uom         String?
+  unitPrice   Float
+  lineTotal   Float
+
+  sortOrder Int @default(0)
+
+  packingEntries PackingEntry[]
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+/// One carton type's packing data for an order. CBM and totals are derived, never stored.
+model PackingEntry {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  orderLineId String?
+  orderLine   OrderLineItem? @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+
+  marks         String?
+  cartonCount   Int
+  qtyPerCarton  Float
+  netWeightKg   Float // per carton
+  grossWeightKg Float // per carton
+  lengthCm      Float
+  widthCm       Float
+  heightCm      Float
+
+  sortOrder Int @default(0)
+
+  @@index([orderId])
+}
+
+// ─── FX (M4) ─────────────────────────────────────────────────────────────────
+
+/// A manually-entered (or later fetched) rate: 1 unit of `currency` = `rateToBase` units of the
+/// tenant's base currency (INR for the India pack). Latest `asOf` wins; history is kept for variance.
+model FxSnapshot {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  currency     String
+  baseCurrency String   @default("INR")
+  rateToBase   Float
+  asOf         DateTime @default(now())
+  source       String   @default("manual")
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId, currency, asOf])
+}
+
+// ─── Purchase orders (M9) ────────────────────────────────────────────────────
+
+enum PurchaseOrderStatus {
+  draft
+  issued
+  acknowledged
+  received
+  cancelled
+}
+
+model PurchaseOrder {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  poNumber String
+  status   PurchaseOrderStatus @default(draft)
+
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+
+  /// Set when the PO is raised from an awarded vendor RFQ.
+  vendorRfqId String? @unique
+
+  currency     String    @default("INR")
+  incoterm     String?
+  paymentTerms String?
+  deliveryDate DateTime?
+  notes        String?
+  total        Float     @default(0)
+  receivedAt   DateTime?
+
+  lines    PurchaseOrderLine[]
+  receipts GoodsReceipt[]
+  bills    VendorBill[]
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, poNumber])
+  @@index([tenantId, status])
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  description String
+  sku         String?
+  quantity    Float
+  uom         String?
+  unitPrice   Float
+  lineTotal   Float
+
+  sortOrder Int @default(0)
+
+  @@index([purchaseOrderId])
+}
+
+
+// ─── Catalogue variants (V2) ─────────────────────────────────────────────────
+
+/// Pure child of Product (scope inherited through the parent). Variants carry their own SKU.
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  sku        String
+  name       String
+  /// Free-form axes, e.g. { "size": "70x140", "colour": "white", "gsm": 500 }.
+  attributes Json?
+  /// Added to the base product price when quoting this variant.
+  priceAdjust Float   @default(0)
+  active     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@unique([productId, sku])
+  @@index([productId])
+}
+
+// ─── Forwarders (V2) ─────────────────────────────────────────────────────────
+
+model Forwarder {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  notes       String?
+  active      Boolean @default(true)
+
+  freightQuotes FreightQuote[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, name])
+}
+
+// ─── Goods receipt (V2) ──────────────────────────────────────────────────────
+
+model GoodsReceipt {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  receiptNumber String
+  receivedAt    DateTime @default(now())
+  notes         String?
+
+  lines GoodsReceiptLine[]
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  @@unique([tenantId, receiptNumber])
+  @@index([tenantId, purchaseOrderId])
+}
+
+model GoodsReceiptLine {
+  id        String       @id @default(cuid())
+  receiptId String
+  receipt   GoodsReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  /// Position of the PO line this receipt answers (null for an unplanned extra).
+  poLineId     String?
+  description  String
+  qtyReceived  Float
+  qtyRejected  Float   @default(0)
+  rejectReason String?
+
+  @@index([receiptId])
+}
+
+// ─── Inventory-lite (V2) ─────────────────────────────────────────────────────
+
+enum StockMovementKind {
+  receipt
+  issue
+  adjustment
+}
+
+model StockItem {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  sku          String
+  name         String
+  location     String  @default("MAIN")
+  uom          String  @default("pcs")
+  reorderLevel Float?
+
+  movements StockMovement[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, sku, location])
+  @@index([tenantId])
+}
+
+/// Quantity is a signed delta: receipts +, issues −, adjustments either. Balance = sum of movements.
+model StockMovement {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  itemId String
+  item   StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  kind     StockMovementKind
+  quantity Float
+  reason   String?
+  refType  String?
+  refId    String?
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId, itemId, createdAt])
+}
+
+// ─── Payables (V2) ───────────────────────────────────────────────────────────
+
+enum VendorBillStatus {
+  open
+  partially_paid
+  paid
+  void
+}
+
+model VendorBill {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+
+  billNumber String
+  billDate   DateTime
+  dueDate    DateTime?
+  currency   String   @default("INR")
+  total      Float
+  status     VendorBillStatus @default(open)
+  notes      String?
+
+  payments VendorPayment[]
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, vendorId, billNumber])
+  @@index([tenantId, status])
+}
+
+model VendorPayment {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  billId String
+  bill   VendorBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  amount    Float
+  paidAt    DateTime
+  mode      String?
+  reference String?
+  notes     String?
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId, billId])
+}
+
+// ─── Bank statement import (V2) ──────────────────────────────────────────────
+
+enum BankMatchStatus {
+  unmatched
+  suggested
+  confirmed
+  ignored
+}
+
+model BankStatementLine {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  importBatch String
+  /// Stable hash of (date, narration, amount, balance) — re-importing the same statement is a no-op.
+  fingerprint String
+
+  txnDate   DateTime
+  narration String
+  reference String?
+  /// Credits positive, debits negative.
+  amount    Float
+  currency  String  @default("INR")
+
+  matchStatus       BankMatchStatus @default(unmatched)
+  matchedInvoiceId  String?
+  matchedBillId     String?
+  matchNote         String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, fingerprint])
+  @@index([tenantId, matchStatus])
+}
+
+// ─── Import landed cost (V3) ─────────────────────────────────────────────────
+
+enum ImportEntryStatus {
+  draft
+  assessed
+  cleared
+}
+
+model ImportEntry {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  entryNumber String
+  boeNumber   String?
+  boeDate     DateTime?
+  vendorId    String?
+  status      ImportEntryStatus @default(draft)
+
+  currency     String @default("USD")
+  /// Customs-notified exchange rate: 1 unit of `currency` = this many INR on the BOE date.
+  exchangeRate Float
+
+  /// Per-entry costs in INR: freight, insurance, port, cha, transport, warehousing, other.
+  freightInr     Float @default(0)
+  insuranceInr   Float @default(0)
+  portInr        Float @default(0)
+  chaInr         Float @default(0)
+  transportInr   Float @default(0)
+  warehousingInr Float @default(0)
+  otherInr       Float @default(0)
+
+  lines ImportEntryLine[]
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, entryNumber])
+  @@index([tenantId, status])
+}
+
+model ImportEntryLine {
+  id      String      @id @default(cuid())
+  entryId String
+  entry   ImportEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  description String
+  hsCode      String?
+  quantity    Float
+  /// FOB/invoice unit price in the entry's foreign currency.
+  unitPrice   Float
+  /// Rates are inputs the importer takes from the tariff/BOE — never hard-coded here.
+  bcdPct      Float @default(0)
+  swsPct      Float @default(10)
+  igstPct     Float @default(18)
+  otherDutyPct Float @default(0)
+
+  sortOrder Int @default(0)
+
+  @@index([entryId])
+}
+
+// ─── Production & QC (V3) ────────────────────────────────────────────────────
+
+enum ProductionRunStatus {
+  planned
+  in_progress
+  completed
+  cancelled
+}
+
+model ProductionRun {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  runNumber          String
+  orderId            String?
+  productDescription String
+  plannedQty         Float
+  producedQty        Float @default(0)
+  status             ProductionRunStatus @default(planned)
+  startDate          DateTime?
+  dueDate            DateTime?
+  notes              String?
+
+  stages ProductionStage[]
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, runNumber])
+  @@index([tenantId, status])
+}
+
+model ProductionStage {
+  id    String        @id @default(cuid())
+  runId String
+  run   ProductionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  name        String
+  sortOrder   Int       @default(0)
+  plannedAt   DateTime?
+  completedAt DateTime?
+  notes       String?
+
+  @@index([runId])
+}
+
+enum QcResult {
+  pending
+  pass
+  fail
+}
+
+model QcInspection {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  inspectionNumber String
+  orderId          String?
+  runId            String?
+  kind             String   @default("final")
+  sampleSize       Int
+  /// Acceptable quality limit for major defects, e.g. 2.5 (percent-defective, simplified acceptance below).
+  aqlMajor         Float    @default(2.5)
+  aqlMinor         Float    @default(4.0)
+  result           QcResult @default(pending)
+  inspectedAt      DateTime?
+  inspector        String?
+  notes            String?
+
+  defects QcDefect[]
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  @@unique([tenantId, inspectionNumber])
+  @@index([tenantId, orderId])
+}
+
+model QcDefect {
+  id           String       @id @default(cuid())
+  inspectionId String
+  inspection   QcInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  description String
+  /// minor | major | critical
+  severity    String
+  count       Int    @default(1)
+
+  @@index([inspectionId])
 }

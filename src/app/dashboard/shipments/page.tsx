@@ -11,12 +11,12 @@ import { EmptyState } from '@/components/dashboard/empty-state';
 type Shipment = Awaited<ReturnType<typeof listShipments>>[number];
 
 export default async function ShipmentsPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'orders:read')) {
     return <p className="text-sm text-muted">You do not have access to shipments.</p>;
   }
 
-  const shipments = await listShipments(tenantId);
+  const shipments = await listShipments();
 
   const columns: DataTableColumn<Shipment>[] = [
     {

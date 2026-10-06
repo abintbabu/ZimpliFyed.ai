@@ -14,16 +14,16 @@ import { NewQuoteForm } from './new-quote-form';
 type Quote = Awaited<ReturnType<typeof listQuotes>>[number];
 
 export default async function QuotesPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'quotes:read')) {
     return <p className="text-sm text-muted">You do not have access to quotes.</p>;
   }
 
   const canWrite = hasPermission(role, 'quotes:write');
   const [quotes, buyers, products] = await Promise.all([
-    listQuotes(tenantId),
-    canWrite ? listBuyers(tenantId) : Promise.resolve([]),
-    canWrite ? listProducts(tenantId) : Promise.resolve([]),
+    listQuotes(),
+    canWrite ? listBuyers() : Promise.resolve([]),
+    canWrite ? listProducts() : Promise.resolve([]),
   ]);
 
   const columns: DataTableColumn<Quote>[] = [

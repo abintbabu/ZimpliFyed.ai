@@ -12,13 +12,13 @@ import { NewProductForm } from './new-product-form';
 type Product = Awaited<ReturnType<typeof listProducts>>[number];
 
 export default async function ProductsPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'products:read')) {
     return <p className="text-sm text-muted">You do not have access to products.</p>;
   }
 
   const canWrite = hasPermission(role, 'products:write');
-  const products = await listProducts(tenantId);
+  const products = await listProducts();
 
   const columns: DataTableColumn<Product>[] = [
     { key: 'sku', header: 'SKU', render: (p) => <span className="font-mono text-xs text-muted">{p.sku}</span> },

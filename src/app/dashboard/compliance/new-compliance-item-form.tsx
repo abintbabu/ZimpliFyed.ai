@@ -9,7 +9,7 @@ import type { ComplianceCategory } from '@prisma/client';
 
 const CATEGORIES = Object.keys(COMPLIANCE_CATEGORY_LABELS) as ComplianceCategory[];
 
-export function NewComplianceItemForm() {
+export function NewComplianceItemForm({ orders = [] }: { orders?: { id: string; orderNumber: string }[] }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +32,7 @@ export function NewComplianceItemForm() {
           expiresAt: expiresAtRaw ? new Date(expiresAtRaw) : undefined,
           renewalLeadDays: Number(formData.get('renewalLeadDays') ?? 30),
           notes: String(formData.get('notes') ?? ''),
+          orderId: String(formData.get('orderId') ?? '') || undefined,
         });
         setOpen(false);
       } catch (err) {
@@ -68,6 +69,15 @@ export function NewComplianceItemForm() {
         Expires on
         <input name="expiresAt" type="date" className="mt-1 block w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" />
       </label>
+      {orders.length > 0 && (
+        <label className="text-xs text-muted sm:col-span-2">
+          For order (certificates issued per shipment)
+          <select name="orderId" className="mt-1 block w-full rounded-lg border border-line px-3 py-2 text-sm text-ink">
+            <option value="">Not tied to an order</option>
+            {orders.map((o) => <option key={o.id} value={o.id}>{o.orderNumber}</option>)}
+          </select>
+        </label>
+      )}
       <label className="text-xs text-muted sm:col-span-2">
         Renewal lead time (days before expiry to flag)
         <input name="renewalLeadDays" type="number" defaultValue={30} className="mt-1 block w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" />

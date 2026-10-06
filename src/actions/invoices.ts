@@ -7,7 +7,8 @@ import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { writeDomainEvent } from '@/lib/domain-events';
 import { withDefaultExpenseMargin, DEFAULT_EXPENSE_PCT, DEFAULT_MARGIN_PCT } from '@/lib/pricing-buildup';
-import type { InvoiceStatus } from '@prisma/client';
+import { validateNote, balanceAfterCredit } from '@/lib/invoice-notes';
+import type { InvoiceStatus, InvoiceNoteKind } from '@prisma/client';
 
 type InvoiceLineInput = {
   description: string;
@@ -30,11 +31,15 @@ function buildLineTotals(lines: InvoiceLineInput[]) {
   return { lines: withDefaults, total: parseFloat(total.toFixed(2)) };
 }
 
-export async function listInvoices(tenantId: string) {
+export async function listInvoices() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'invoices:read')) throw new Error('You do not have permission to view this');
   return prisma.invoice.findMany({ where: { tenantId }, include: { lines: true }, orderBy: { createdAt: 'desc' } });
 }
 
-export async function getInvoice(tenantId: string, invoiceId: string) {
+export async function getInvoice(invoiceId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'invoices:read')) throw new Error('You do not have permission to view this');
   return prisma.invoice.findFirst({ where: { id: invoiceId, tenantId }, include: { lines: true } });
 }
 
@@ -44,7 +49,11 @@ export async function createInvoice(input: {
   templateId?: string;
   currency?: string;
   dueDate?: Date;
+  /** Legacy flag — prefer `noteKind`. Kept so older callers keep working; dual-written from `noteKind`. */
   isCreditOrDebitNote?: boolean;
+  noteKind?: InvoiceNoteKind;
+  originalInvoiceId?: string;
+  noteReason?: string;
   lines: InvoiceLineInput[];
 }) {
   const session = await requireTenantSession();
@@ -52,20 +61,63 @@ export async function createInvoice(input: {
   if (!hasPermission(role, 'invoices:write')) throw new Error('You do not have permission to create invoices');
 
   const { lines, total } = buildLineTotals(input.lines);
+  const currency = input.currency || 'USD';
+  const noteKind = input.noteKind ?? null;
 
-  const invoice = await prisma.invoice.create({
-    data: {
-      tenantId,
-      invoiceNumber: input.invoiceNumber,
-      orderId: input.orderId || null,
-      templateId: input.templateId || null,
-      currency: input.currency || 'USD',
-      total,
-      balanceDue: total,
-      dueDate: input.dueDate || null,
-      isCreditOrDebitNote: input.isCreditOrDebitNote ?? false,
-      lines: { create: lines },
-    },
+  // A typed note is validated against the invoice it amends (same currency, can't credit more than billed).
+  let original: { id: string; total: number; balanceDue: number; currency: string; isCreditOrDebitNote: boolean } | null = null;
+  if (noteKind) {
+    if (input.originalInvoiceId) {
+      original = await prisma.invoice.findFirst({
+        where: { id: input.originalInvoiceId, tenantId },
+        select: { id: true, total: true, balanceDue: true, currency: true, isCreditOrDebitNote: true },
+      });
+      if (!original) throw new Error('The invoice you are crediting was not found');
+    }
+    const priorCredits = original
+      ? (await prisma.invoice.aggregate({
+          where: { tenantId, originalInvoiceId: original.id, noteKind: 'credit' },
+          _sum: { total: true },
+        }))._sum.total ?? 0
+      : 0;
+    const problem = validateNote({
+      kind: noteKind,
+      reason: input.noteReason ?? '',
+      noteTotal: total,
+      noteCurrency: currency,
+      original: original ? { total: original.total, currency: original.currency, isNote: original.isCreditOrDebitNote } : null,
+      priorCreditsOnOriginal: priorCredits,
+    });
+    if (problem) throw new Error(problem);
+  }
+
+  const invoice = await prisma.$transaction(async (tx) => {
+    const created = await tx.invoice.create({
+      data: {
+        tenantId,
+        invoiceNumber: input.invoiceNumber,
+        orderId: input.orderId || null,
+        templateId: input.templateId || null,
+        currency,
+        total,
+        balanceDue: total,
+        dueDate: input.dueDate || null,
+        isCreditOrDebitNote: noteKind ? true : (input.isCreditOrDebitNote ?? false),
+        noteKind,
+        originalInvoiceId: noteKind ? (original?.id ?? null) : null,
+        noteReason: noteKind ? (input.noteReason?.trim() || null) : null,
+        lines: { create: lines },
+      },
+    });
+    // A credit note reduces what the buyer still owes on the original, so the chase sweeps and cash-flow
+    // forecast stop pursuing money that has been credited back.
+    if (noteKind === 'credit' && original) {
+      await tx.invoice.update({
+        where: { id: original.id, tenantId },
+        data: { balanceDue: balanceAfterCredit(original.balanceDue, total) },
+      });
+    }
+    return created;
   });
 
   await writeAudit({
@@ -171,7 +223,9 @@ function normalizeTemplateLines(lines: TemplateLine[]) {
     }));
 }
 
-export async function listInvoiceTemplates(tenantId: string) {
+export async function listInvoiceTemplates() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'invoices:read')) throw new Error('You do not have permission to view this');
   return prisma.invoiceTemplate.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } });
 }
 

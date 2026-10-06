@@ -3,6 +3,8 @@ import { requireTenantSession } from '@/lib/session-tenant';
 import { hasPermission } from '@/lib/permissions';
 import { getQuote } from '@/actions/quotes';
 import { getCostSheet } from '@/actions/cost-sheets';
+import { checkBuyerCredit } from '@/actions/buyers';
+import { CreditWarning } from '@/components/credit-warning';
 import { prisma } from '@/lib/prisma';
 import { DealRail } from '@/components/deal-rail';
 import { CostSheetPanel } from '@/components/cost-sheet-panel';
@@ -18,12 +20,17 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
     return <p className="text-sm text-muted">You do not have access to quotes.</p>;
   }
 
-  const quote = await getQuote(tenantId, id);
+  const quote = await getQuote(id);
   if (!quote) notFound();
 
   const order = quote.orderId ? await prisma.order.findFirst({ where: { id: quote.orderId, tenantId } }) : null;
   const invoice = order ? await prisma.invoice.findFirst({ where: { orderId: order.id, tenantId } }) : null;
-  const costSheet = await getCostSheet(tenantId, quote.id);
+  const costSheet = await getCostSheet(quote.id);
+  // Once an order is invoiced its balance is already in the buyer's open exposure — don't count it twice.
+  const creditCheck =
+    quote.buyerId && !invoice && quote.status !== 'declined' && quote.status !== 'expired'
+      ? await checkBuyerCredit(quote.buyerId, quote.total, quote.currency)
+      : null;
   const avgUnitPrice = quote.lines.length
     ? quote.lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0) / quote.lines.reduce((sum, l) => sum + l.quantity, 0)
     : 0;
@@ -41,6 +48,8 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
         </div>
         <QuoteActions quoteId={quote.id} status={quote.status} canWrite={hasPermission(role, 'quotes:write')} />
       </div>
+
+      {quote.buyer && <CreditWarning check={creditCheck} buyerName={quote.buyer.name} />}
 
       {(quote.parentQuote || quote.revisions.length > 0) && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">

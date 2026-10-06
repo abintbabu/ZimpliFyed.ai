@@ -5,7 +5,7 @@ import { createTask } from '@/actions/tasks';
 import { ROLE_LABELS } from '@/lib/permissions';
 import type { MembershipRole, TaskPriority } from '@prisma/client';
 
-type Member = { id: string; role: MembershipRole; user: { name: string | null; email: string | null } };
+type Member = { userId: string; role: MembershipRole; name: string | null; email: string | null };
 
 export function NewTaskForm({ members }: { members: Member[] }) {
   const [open, setOpen] = useState(false);
@@ -48,8 +48,8 @@ export function NewTaskForm({ members }: { members: Member[] }) {
       <select name="assigneeUserId" required defaultValue="" className="rounded-lg border border-line px-3 py-2 text-sm text-ink">
         <option value="" disabled>Assign to…</option>
         {members.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.user.name || m.user.email} · {ROLE_LABELS[m.role]}
+          <option key={m.userId} value={m.userId}>
+            {m.name || m.email} · {ROLE_LABELS[m.role]}
           </option>
         ))}
       </select>

@@ -4,6 +4,7 @@ import { writeDomainEvent } from '@/lib/domain-events';
 import { writeAudit } from '@/lib/audit';
 import { getPack } from '@/packs/registry';
 import type { TenantSession } from '@/lib/session-tenant';
+import type { AuditActor } from '@/lib/audit';
 import type { DocContext } from './context';
 import { buildDocModel, type DocType } from './models';
 import { issueDocNumber } from './numbering';
@@ -34,7 +35,7 @@ export async function issueDocSet(input: {
 }): Promise<IssueResult> {
   const { tenantId, docSetId, userId, role } = input;
   const packId = input.packId ?? 'in';
-  const session: TenantSession = { tenantId, userId, role };
+  const session: AuditActor = { tenantId, userId, role };
 
   return prisma.$transaction(async (tx) => {
     const docSet = await tx.docSet.findFirst({
@@ -127,7 +128,7 @@ export async function cancelExportDocument(input: {
   reason: string;
 }): Promise<CancelResult> {
   const { tenantId, exportDocumentId, userId, role, reason } = input;
-  const session: TenantSession = { tenantId, userId, role };
+  const session: AuditActor = { tenantId, userId, role };
 
   return prisma.$transaction(async (tx) => {
     const doc = await tx.exportDocument.findFirst({ where: { id: exportDocumentId, tenantId } });

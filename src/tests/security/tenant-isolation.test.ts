@@ -45,10 +45,9 @@ const FILE_EXEMPT = new Set<string>([
   // Tokenised entry point (§4.5 pattern): resolves by the invite token itself, pre-auth, pre-tenant.
   'src/app/join/[token]/page.tsx',
   // Public webhook: tenant resolved from the matched InboxChannel (phone_number_id), never from a
-  // session — there isn't one. NOTE: this route does not yet verify X-Hub-Signature-256
-  // (EXPORT_OS_MASTER_PLAN §10.2 / §17 launch blocker #2, Wave 4 — out of scope for Wave 0's
-  // isolation work, but a real, currently-open gap: anyone who learns a phone_number_id can inject
-  // messages into a tenant's inbox today).
+  // session — there isn't one. The caller is instead authenticated by an HMAC over the raw body
+  // (X-Hub-Signature-256, verified in the route; EXPORT_OS_MASTER_PLAN §10.2 / §17 launch
+  // blocker #2), which fails closed in production when WHATSAPP_APP_SECRET is unset.
   'src/app/api/inbox/whatsapp/route.ts',
 ]);
 
@@ -161,6 +160,45 @@ function stripComments(src: string): string {
   return out;
 }
 
+/**
+ * Invariant D (§5.1 step 5): no exported server action may accept its tenantId from the caller.
+ *
+ * This closes the structural blind spot in proof (A). Proof (A) is satisfied whenever the literal
+ * token `tenantId` appears in a prisma call's arguments — it cannot tell a session-derived id from
+ * one the caller supplied. Every `'use server'` export is a reachable POST endpoint (Next.js
+ * guarantees only that action IDs are non-deterministic and cached ≤14 days, explicitly *not* that
+ * they are an authorization substitute — see node_modules/next/dist/docs/01-app/02-guides/
+ * data-security.md), so a `tenantId` parameter on an exported action is an attacker-controlled
+ * tenant selector that the per-call scan waves through.
+ *
+ * The rule: in src/actions/**, an exported async function may only take a `tenantId` parameter if
+ * its body calls requirePlatformAdmin() — the platform console operates across tenants by design.
+ * Everything else must derive tenantId from requireTenantSession().
+ */
+function exportedActionsTakingTenantId(rel: string, src: string): string[] {
+  if (!rel.startsWith(path.join('src', 'actions'))) return [];
+  const out: string[] = [];
+  const re = /export async function (\w+)\s*\(/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src))) {
+    const name = m[1];
+    const openIdx = m.index + m[0].length - 1;
+    const params = balancedArgs(src, openIdx);
+    if (!/\btenantId\s*:\s*string/.test(params)) continue;
+
+    // Body = from the end of the signature to the next top-level `export ` (or EOF).
+    const afterParams = balancedSpanEnd(src, openIdx);
+    const nextExport = src.indexOf('\nexport ', afterParams);
+    const body = src.slice(afterParams, nextExport === -1 ? src.length : nextExport);
+    if (/requirePlatformAdmin/.test(body)) continue; // cross-tenant by design, and gated
+
+    out.push(
+      `${rel}:${lineOf(src, m.index)}  exported action ${name}() takes a caller-supplied tenantId — derive it from requireTenantSession() instead (invariant D)`,
+    );
+  }
+  return out;
+}
+
 /** Char spans covered by a withTenant(...)/withPlatformScope(...) call, proof (C). */
 function scopedSpans(src: string): { start: number; end: number; kind: 'tenant' | 'platform' }[] {
   const spans: { start: number; end: number; kind: 'tenant' | 'platform' }[] = [];
@@ -255,6 +293,9 @@ function run() {
         violations.push(`${rel}:${line}  prisma.${accessor}.${op}() has no tenantId in its arguments`);
       }
     }
+
+    // Invariant D: no exported server action may take its tenantId from the caller.
+    violations.push(...exportedActionsTakingTenantId(rel, src));
 
     // Invariant A: an entry-point file touching tenant data must authenticate the tenant (or run
     // inside a scope). Not enforced for lib/ai/scripts plumbing — see SCAN_ROOTS comment.

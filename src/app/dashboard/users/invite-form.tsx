@@ -2,25 +2,32 @@
 
 import { useState, useTransition } from 'react';
 import { inviteUser } from '@/actions/users';
-import { ROLE_LABELS } from '@/lib/permissions';
+import { ASSIGNABLE_ROLES, ROLE_LABELS } from '@/lib/permissions';
 import type { MembershipRole } from '@prisma/client';
-
-const INVITABLE_ROLES: MembershipRole[] = ['viewer', 'sales', 'finance', 'admin'];
 
 export function InviteUserForm() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<MembershipRole>('viewer');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const submit = (formData: FormData) => {
     setError(null);
+    setNotice(null);
     const value = String(formData.get('email') ?? '').trim();
     if (!value) return;
     startTransition(async () => {
       try {
-        await inviteUser(value, role);
+        const result = await inviteUser(value, role);
         setEmail('');
+        // A send failure isn't an invite failure — the row is committed and the link works. Say so
+        // plainly instead of reporting success and leaving the invitee waiting for an email.
+        setNotice(
+          result.emailed
+            ? `Invite sent to ${value}.`
+            : `Invite created for ${value}, but the email could not be sent. Share the invite link from Pending invites.`,
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to invite user');
       }
@@ -48,7 +55,7 @@ export function InviteUserForm() {
           onChange={(e) => setRole(e.target.value as MembershipRole)}
           className="rounded-lg border border-line px-3 py-2 text-sm text-ink"
         >
-          {INVITABLE_ROLES.map((r) => (
+          {ASSIGNABLE_ROLES.map((r) => (
             <option key={r} value={r}>{ROLE_LABELS[r]}</option>
           ))}
         </select>
@@ -61,6 +68,7 @@ export function InviteUserForm() {
         {pending ? 'Inviting…' : 'Invite'}
       </button>
       {error && <p className="w-full text-sm text-red-600">{error}</p>}
+      {notice && <p className="w-full text-sm text-muted">{notice}</p>}
     </form>
   );
 }

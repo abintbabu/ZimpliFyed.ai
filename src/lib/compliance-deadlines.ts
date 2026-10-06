@@ -10,6 +10,11 @@ export const COMPLIANCE_CATEGORY_LABELS: Record<string, string> = {
   bis: 'BIS',
   buyer_cert: 'Buyer-required cert',
   other: 'Other',
+  // Per-shipment certificates (certificate registry): linked to an order, tracked for expiry like any other item.
+  coo: 'Certificate of Origin',
+  phytosanitary: 'Phytosanitary certificate',
+  fumigation: 'Fumigation certificate',
+  inspection: 'Inspection certificate',
 };
 
 /** Start of the alert window for an item: renewalLeadDays before expiry. Used by the expiry sweep to decide

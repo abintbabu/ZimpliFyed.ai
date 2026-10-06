@@ -8,7 +8,9 @@ import { writeAudit } from '@/lib/audit';
 import { requireFeature } from '@/lib/billing/entitlements';
 import type { ComplianceCategory } from '@prisma/client';
 
-export async function listComplianceItems(tenantId: string) {
+export async function listComplianceItems() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'compliance:read')) throw new Error('You do not have permission to view this');
   return prisma.complianceItem.findMany({ where: { tenantId }, orderBy: { expiresAt: 'asc' } });
 }
 
@@ -21,16 +23,20 @@ export async function createComplianceItem(input: {
   expiresAt?: Date;
   renewalLeadDays?: number;
   notes?: string;
+  /** Link a per-shipment certificate (COO, phyto, fumigation, inspection…) to its order. */
+  orderId?: string;
 }) {
   const session = await requireTenantSession();
   const { tenantId, role } = session;
   if (!hasPermission(role, 'compliance:write')) throw new Error('You do not have permission to manage compliance items');
   await requireFeature(tenantId, 'compliance_vault');
   if (!input.name.trim()) throw new Error('Name is required');
+  if (input.orderId && !(await prisma.order.findFirst({ where: { id: input.orderId, tenantId }, select: { id: true } }))) throw new Error('Order not found');
 
   const item = await prisma.complianceItem.create({
     data: {
       tenantId,
+      orderId: input.orderId || null,
       category: input.category,
       name: input.name.trim(),
       issuingAuthority: input.issuingAuthority?.trim() || null,

@@ -32,7 +32,7 @@ export async function getGstPrepPack(period: string): Promise<GstPrepPack> {
     }),
     prisma.invoice.findMany({
       where: { tenantId, isDemo: false, createdAt: { gte: start, lt: end } },
-      select: { id: true, currency: true, total: true, isCreditOrDebitNote: true },
+      select: { id: true, currency: true, total: true, isCreditOrDebitNote: true, noteKind: true },
     }),
   ]);
 

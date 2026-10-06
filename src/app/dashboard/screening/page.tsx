@@ -6,10 +6,10 @@ import { ScreeningForm } from './screening-form';
 import { ScreeningHistory } from './screening-history';
 
 export default async function ScreeningPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'compliance:read')) redirect('/dashboard');
 
-  const checks = await listScreeningChecks(tenantId);
+  const checks = await listScreeningChecks();
   const canWrite = hasPermission(role, 'compliance:write');
   const apiConfigured = Boolean(process.env.CSL_API_KEY);
 

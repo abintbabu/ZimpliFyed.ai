@@ -17,6 +17,11 @@ import { DocSetPanel } from '@/components/doc-set-panel';
 import { ShipmentTimelinePanel } from '@/components/shipment-timeline-panel';
 import { LcAdvisorPanel } from '@/components/lc-advisor-panel';
 import { OrderPnlPanel } from '@/components/order-pnl-panel';
+import { MarginLeakPanel } from '@/components/margin-leak-panel';
+import { getOrderMarginLeak } from '@/actions/margin-leak';
+import { OrderLinesPanel } from '@/components/order-lines-panel';
+import { PackingPanel } from '@/components/packing-panel';
+import { LoadPlannerPanel } from '@/components/load-planner-panel';
 import { OrderStatusActions } from './order-status-actions';
 import { listShipmentsForOrder } from '@/actions/shipments';
 import { OrderShipmentAction } from './order-shipment-action';
@@ -30,18 +35,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     return <p className="text-sm text-muted">You do not have access to orders.</p>;
   }
 
-  const order = await getOrder(tenantId, id);
+  const order = await getOrder(id);
   if (!order) notFound();
 
   const invoice = order.invoices[0] ?? null;
   const documents = await listDocuments('orders', order.id);
-  const exportDocuments = await listExportDocuments(tenantId, order.id);
-  const milestones = await listShipmentMilestones(tenantId, order.id);
-  const letterOfCredits = await listLettersOfCredit(tenantId, order.id);
+  const exportDocuments = await listExportDocuments(order.id);
+  const milestones = await listShipmentMilestones(order.id);
+  const letterOfCredits = await listLettersOfCredit(order.id);
   const pnl = await getOrderPnl(order.id);
+  const marginLeak = await getOrderMarginLeak(order.id);
   const docContext = await buildDocContext(tenantId, order.id);
   const docSet = await getOrderDocSet(order.id);
-  const shipments = await listShipmentsForOrder(tenantId, order.id);
+  const shipments = await listShipmentsForOrder(order.id);
 
   return (
     <div className="space-y-6">
@@ -70,9 +76,29 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         <div><p className="text-xs text-muted">Destination</p><p className="text-ink">{order.destination ?? '—'}</p></div>
       </div>
 
+      <OrderLinesPanel
+        orderId={order.id}
+        currency={order.currency ?? order.quote?.currency ?? 'USD'}
+        canWrite={hasPermission(role, 'orders:write')}
+        initial={order.lines.length > 0 ? order.lines : (order.quote?.lines ?? []).map((l) => ({ id: l.id, description: l.description, hsCode: null, quantity: l.quantity, uom: null, unitPrice: l.unitPrice }))}
+      />
+
+      {order.lines.length > 0 && (
+        <PackingPanel
+          orderId={order.id}
+          canWrite={hasPermission(role, 'orders:write')}
+          lines={order.lines.map((l) => ({ id: l.id, description: l.description, quantity: l.quantity }))}
+          initial={order.packingEntries}
+        />
+      )}
+
+      {order.packingEntries.length > 0 && <LoadPlannerPanel entries={order.packingEntries} />}
+
       <OrderBuyerTrackPanel orderId={order.id} tracks={order.buyerTracks} />
 
-      <OrderPnlPanel pnl={pnl} currency={order.quote?.currency ?? invoice?.currency ?? 'USD'} />
+      <OrderPnlPanel pnl={pnl} currency={order.currency ?? order.quote?.currency ?? invoice?.currency ?? 'USD'} />
+
+      <MarginLeakPanel report={marginLeak} />
 
       <ShipmentTimelinePanel
         orderId={order.id}
@@ -84,6 +110,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         orderId={order.id}
         initialLcs={letterOfCredits}
         canWrite={hasPermission(role, 'orders:write')}
+        orderShipped={['shipped', 'in_transit', 'delivered'].includes(order.status)}
       />
 
       <DocReadinessPanel result={docContext} />

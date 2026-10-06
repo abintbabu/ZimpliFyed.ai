@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { __gmailInternals } from '../../lib/inbox/gmail';
 import { buildReplyMime, replySubject, parseGmailReplyPayload } from '../../lib/inbox/gmail-send';
-import { parseWhatsAppSendPayload } from '../../lib/whatsapp/send';
+import { parseWhatsAppSendPayload, parseWhatsAppSessionPayload } from '../../lib/whatsapp/send';
 import { getInboxProvider, ProviderNotConfiguredError } from '../../lib/inbox/provider';
+import { verifyWhatsAppSignature, signWhatsAppBody } from '../../lib/whatsapp/webhook-signature';
 
 /**
  * Inbox connector unit tests — the pure parsing/serialization edges of the Gmail and WhatsApp paths.
@@ -181,12 +182,23 @@ assert.equal(replySubject(''), 'Re: ', 'missing subject still yields a well-form
   }
 }
 
+// ── WhatsApp session (free-form) payloads: must never be mistaken for a template send, or vice-versa ──
+assert.deepEqual(parseWhatsAppSessionPayload({ channel: 'whatsapp', to: '919876543210', text: 'Your samples shipped today.' }), { to: '919876543210', text: 'Your samples shipped today.', account: undefined });
+assert.equal(parseWhatsAppSessionPayload({ channel: 'whatsapp', to: '919876543210', template: 'quote_sent', text: 'x' }), null, 'a payload naming a template is a template send');
+assert.equal(parseWhatsAppSendPayload({ channel: 'whatsapp', to: '919876543210', text: 'hi' }), null, 'a text payload is not a template send');
+assert.equal(parseWhatsAppSessionPayload({ channel: 'email', to: '919876543210', text: 'x' }), null);
+assert.equal(parseWhatsAppSessionPayload({ channel: 'whatsapp', to: '+91 98765 43210', text: 'x' }), null, 'recipient must be bare E.164 digits');
+assert.equal(parseWhatsAppSessionPayload({ channel: 'whatsapp', to: '123', text: 'x' }), null, 'too short to be a number');
+assert.equal(parseWhatsAppSessionPayload({ channel: 'whatsapp', to: '919876543210' }), null, 'no text');
+assert.equal(parseWhatsAppSessionPayload(null), null); assert.equal(parseWhatsAppSessionPayload('x'), null);
+
 async function main() {
   // manual pulls nothing and does not error — the triage pipeline runs with zero credentials.
   assert.deepEqual(await getInboxProvider('manual').fetch({ tenantId: 't', account: '', cursor: null }), { messages: [], cursor: null });
 
   // Unwired connectors raise the typed sentinel callers surface as a channel error, not a generic crash.
-  for (const kind of ['email', 'imap', 'whatsapp'] as const) {
+  // (imap graduated to a live connector — see imap.test.ts.)
+  for (const kind of ['email', 'whatsapp'] as const) {
     await assert.rejects(
       () => getInboxProvider(kind).fetch({ tenantId: 't', account: '', cursor: null }),
       (err: unknown) => err instanceof ProviderNotConfiguredError && (err as Error).name === 'ProviderNotConfiguredError',
@@ -198,3 +210,44 @@ async function main() {
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });
+
+// ── WhatsApp webhook signature (X-Hub-Signature-256) ─────────────────────────
+// The webhook has no session, so this HMAC is the only thing standing between a stranger and a
+// tenant's inbox. Before it existed, anyone who learned a phone_number_id could inject messages.
+{
+  const SECRET = 'test-app-secret';
+  const body = JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ id: 'wamid.1' }] } }] }] });
+  const good = signWhatsAppBody(body, SECRET);
+
+  assert.equal(verifyWhatsAppSignature(body, good, SECRET, 'production'), true, 'valid signature accepted');
+  assert.equal(verifyWhatsAppSignature(body, null, SECRET, 'production'), false, 'missing header rejected');
+  assert.equal(verifyWhatsAppSignature(body, '', SECRET, 'production'), false, 'empty header rejected');
+  assert.equal(
+    verifyWhatsAppSignature(body, good.replace('sha256=', ''), SECRET, 'production'),
+    false,
+    'digest without the sha256= prefix rejected',
+  );
+  assert.equal(verifyWhatsAppSignature(body, good, 'wrong-secret', 'production'), false, 'signature from another secret rejected');
+  assert.equal(
+    verifyWhatsAppSignature(body + ' ', good, SECRET, 'production'),
+    false,
+    'body tampered after signing rejected — this is the injection case',
+  );
+  // A malformed hex digest must be rejected, not throw: Buffer.from(hex) truncates silently, so the
+  // length check is what catches it (timingSafeEqual would throw on a length mismatch).
+  assert.equal(verifyWhatsAppSignature(body, 'sha256=zzzz', SECRET, 'production'), false, 'non-hex digest rejected, no throw');
+  assert.equal(verifyWhatsAppSignature(body, 'sha256=' + 'ab'.repeat(16), SECRET, 'production'), false, 'short digest rejected, no throw');
+
+  // Secret unset: fail closed in production, permissive locally so the pipeline is testable.
+  assert.equal(verifyWhatsAppSignature(body, good, undefined, 'production'), false, 'no secret in production → fail closed');
+  assert.equal(verifyWhatsAppSignature(body, null, undefined, 'development'), true, 'no secret in dev → allow unsigned');
+
+  // Re-serialised JSON produces different bytes than Meta signed — the reason the route reads
+  // req.text() and parses afterwards rather than calling req.json().
+  const reserialised = JSON.stringify(JSON.parse(body));
+  assert.equal(
+    verifyWhatsAppSignature(reserialised, signWhatsAppBody(body, SECRET), SECRET, 'production'),
+    reserialised === body,
+    'signature is over raw bytes, not the parsed object',
+  );
+}

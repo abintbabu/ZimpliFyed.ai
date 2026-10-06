@@ -116,6 +116,48 @@ const FIXTURES: Record<string, Fixture> = {
   },
 };
 
+/**
+ * Fixtures for the V2/V3 models, verified against a real Postgres. Every one of these models carries a direct
+ * tenantId, so each must behave identically to the originals: a list, a point lookup and a targeted update under
+ * the WRONG tenant's scope see and affect nothing. Creating them also proves the required fields and foreign keys
+ * in schema.prisma are satisfiable on a real database, not just on paper.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Delegate = any;
+function simple(delegate: () => Delegate, make: (tenantId: string, tag: string) => Promise<{ id: string }>, touch: Record<string, unknown>): Fixture {
+  return {
+    create: make,
+    cleanup: (tenantIds) => delegate().deleteMany({ where: { tenantId: { in: tenantIds } } }).then(() => undefined),
+    findMany: (tenantId) => delegate().findMany({ where: { tenantId }, select: { id: true } }),
+    findScoped: (id, tenantId) => delegate().findFirst({ where: { id, tenantId } }),
+    updateScopedCount: async (id, tenantId) => (await delegate().updateMany({ where: { id, tenantId }, data: touch })).count,
+  };
+}
+const vendorFor = (tenantId: string, tag: string) => prisma.vendor.create({ data: { tenantId, name: `${tag} Vendor` } });
+
+Object.assign(FIXTURES, {
+  Forwarder: simple(() => prisma.forwarder, (tenantId, tag) => prisma.forwarder.create({ data: { tenantId, name: `${tag} Fwd` } }), { notes: 'updated' }),
+  FxSnapshot: simple(() => prisma.fxSnapshot, (tenantId) => prisma.fxSnapshot.create({ data: { tenantId, currency: 'USD', rateToBase: 84.5 } }), { source: 'updated' }),
+  StockItem: simple(() => prisma.stockItem, (tenantId, tag) => prisma.stockItem.create({ data: { tenantId, sku: `${tag}-SKU`, name: 'Item' } }), { name: 'updated' }),
+  PurchaseOrder: simple(() => prisma.purchaseOrder, async (tenantId, tag) => {
+    const v = await vendorFor(tenantId, tag);
+    return prisma.purchaseOrder.create({ data: { tenantId, poNumber: `${tag}-PO`, vendorId: v.id, createdByUserId: 'iso-live-test', lines: { create: [{ description: 'Yarn', quantity: 1, unitPrice: 1, lineTotal: 1 }] } } });
+  }, { notes: 'updated' }),
+  GoodsReceipt: simple(() => prisma.goodsReceipt, async (tenantId, tag) => {
+    const v = await vendorFor(tenantId, tag);
+    const po = await prisma.purchaseOrder.create({ data: { tenantId, poNumber: `${tag}-GRNPO`, vendorId: v.id, createdByUserId: 'iso-live-test' } });
+    return prisma.goodsReceipt.create({ data: { tenantId, purchaseOrderId: po.id, receiptNumber: `${tag}-GRN`, createdByUserId: 'iso-live-test', lines: { create: [{ description: 'Yarn', qtyReceived: 1 }] } } });
+  }, { notes: 'updated' }),
+  VendorBill: simple(() => prisma.vendorBill, async (tenantId, tag) => {
+    const v = await vendorFor(tenantId, tag);
+    return prisma.vendorBill.create({ data: { tenantId, vendorId: v.id, billNumber: `${tag}-BILL`, billDate: new Date(), total: 100, createdByUserId: 'iso-live-test' } });
+  }, { notes: 'updated' }),
+  BankStatementLine: simple(() => prisma.bankStatementLine, (tenantId, tag) => prisma.bankStatementLine.create({ data: { tenantId, importBatch: tag, fingerprint: `${tag}-fp`, txnDate: new Date(), narration: 'NEFT', amount: 10 } }), { matchNote: 'updated' }),
+  ImportEntry: simple(() => prisma.importEntry, (tenantId, tag) => prisma.importEntry.create({ data: { tenantId, entryNumber: `${tag}-IMP`, exchangeRate: 80, createdByUserId: 'iso-live-test', lines: { create: [{ description: 'Widget', quantity: 1, unitPrice: 1 }] } } }), { boeNumber: 'updated' }),
+  ProductionRun: simple(() => prisma.productionRun, (tenantId, tag) => prisma.productionRun.create({ data: { tenantId, runNumber: `${tag}-RUN`, productDescription: 'Towels', plannedQty: 10, createdByUserId: 'iso-live-test', stages: { create: [{ name: 'Cut' }] } } }), { notes: 'updated' }),
+  QcInspection: simple(() => prisma.qcInspection, (tenantId, tag) => prisma.qcInspection.create({ data: { tenantId, inspectionNumber: `${tag}-QC`, sampleSize: 10, createdByUserId: 'iso-live-test', defects: { create: [{ description: 'Stain', severity: 'minor' }] } } }), { notes: 'updated' }),
+});
+
 async function main() {
   const tag = `iso-live-${Date.now()}`;
   const tenantA = await prisma.tenant.create({ data: { slug: `${tag}-a`, name: 'Isolation Test A' } });
@@ -140,9 +182,11 @@ async function main() {
     }
     console.log(`✓ tenant-isolation-live: ${Object.keys(FIXTURES).length} model(s), 2 tenants each — no cross-tenant reads/writes possible`);
   } finally {
-    for (const fixture of Object.values(FIXTURES)) {
+    // Reverse order so dependants (receipts, bills) are removed before the POs/vendors they reference.
+    for (const fixture of Object.values(FIXTURES).reverse()) {
       await fixture.cleanup([tenantA.id, tenantB.id]);
     }
+    await prisma.vendor.deleteMany({ where: { tenantId: { in: [tenantA.id, tenantB.id] } } });
     await prisma.tenant.deleteMany({ where: { id: { in: [tenantA.id, tenantB.id] } } });
     await prisma.$disconnect();
   }

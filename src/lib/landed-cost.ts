@@ -6,9 +6,11 @@ import type { CostCategory } from '@prisma/client';
 export const INCOTERMS = ['EXW', 'FCA', 'FOB', 'CFR', 'CIF', 'DAP', 'DDP'] as const;
 export type Incoterm = (typeof INCOTERMS)[number];
 
-const EXW_CATEGORIES: CostCategory[] = ['material', 'conversion', 'packing'];
+// Agent commission is the seller's cost under every term, so it enters at EXW.
+const EXW_CATEGORIES: CostCategory[] = ['material', 'conversion', 'packing', 'commission'];
 const FCA_CATEGORIES: CostCategory[] = [...EXW_CATEGORIES, 'inland_freight'];
-const FOB_CATEGORIES: CostCategory[] = [...FCA_CATEGORIES, 'cha', 'port'];
+// Export clearance, documentation and the seller's bank charges arrive with delivery to the vessel.
+const FOB_CATEGORIES: CostCategory[] = [...FCA_CATEGORIES, 'cha', 'port', 'documentation', 'bank_charges'];
 const CFR_CATEGORIES: CostCategory[] = [...FOB_CATEGORIES, 'freight'];
 const CIF_CATEGORIES: CostCategory[] = [...CFR_CATEGORIES, 'insurance'];
 const DAP_CATEGORIES: CostCategory[] = [...CIF_CATEGORIES, 'finance_cost'];
@@ -45,6 +47,8 @@ export type LandedCostResult = {
   rodtepCreditPerUnit: number;
   landedCostPerUnit: number;
   landedMarginPct: number | undefined;
+  /** Lowest price at which the seller makes no money: the landed cost itself. */
+  breakEvenPricePerUnit: number;
   excludedLines: { category: CostCategory; amountPerUnit: number }[];
 };
 
@@ -62,7 +66,13 @@ export function computeLandedCost(input: LandedCostInput): LandedCostResult {
     ? parseFloat((((input.sellPricePerUnit - landedCostPerUnit) / input.sellPricePerUnit) * 100).toFixed(2))
     : undefined;
 
-  return { grossCostPerUnit, rodtepCreditPerUnit, landedCostPerUnit, landedMarginPct, excludedLines };
+  return { grossCostPerUnit, rodtepCreditPerUnit, landedCostPerUnit, landedMarginPct, breakEvenPricePerUnit: landedCostPerUnit, excludedLines };
+}
+
+/** Price needed to earn `marginPct` (margin on price) over a landed cost. Null for a margin of 100% or more. */
+export function priceForTargetMargin(landedCostPerUnit: number, marginPct: number): number | null {
+  if (!(marginPct < 100) || marginPct < 0) return null;
+  return parseFloat((landedCostPerUnit / (1 - marginPct / 100)).toFixed(2));
 }
 
 export type VendorQuoteLandedCostInput = {

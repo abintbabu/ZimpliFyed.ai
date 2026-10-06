@@ -4,7 +4,7 @@
  * transaction (see doc-engine/numbering.ts). Pure so the format and the collision walk are testable.
  */
 
-export type DocNumberPrefix = 'QT' | 'ORD' | 'INV' | 'SHP';
+export type DocNumberPrefix = 'QT' | 'ORD' | 'INV' | 'SHP' | 'PO' | 'GRN' | 'BILL' | 'IMP' | 'RUN' | 'QC';
 
 export function formatDocNumber(prefix: DocNumberPrefix, seq: number, now: Date): string {
   return `${prefix}-${now.getFullYear()}-${String(seq).padStart(4, '0')}`;

@@ -115,6 +115,36 @@ export const RULES: Rule[] = [
       return out;
     },
   },
+  // ── Packing list carton data (M2) — only runs when the list carries cartons ──
+  {
+    id: 'pl_gross_ge_net',
+    severity: 'error',
+    requires: ['packing_list'],
+    check: (m) => {
+      const pl = packing(m.get('packing_list'));
+      if (!pl?.cartons) return [];
+      return pl.cartons.flatMap((c, i) =>
+        c.grossWeightKg < c.netWeightKg
+          ? [finding('pl_gross_ge_net', 'error', ['packing_list'],
+              `Cartons ${c.cartonRange}: gross weight ${c.grossWeightKg} kg is less than net weight ${c.netWeightKg} kg.`,
+              `packing_list.cartons[${i}].grossWeightKg`)]
+          : [],
+      );
+    },
+  },
+  {
+    id: 'pl_packed_qty_matches_goods',
+    severity: 'error',
+    requires: ['packing_list'],
+    check: (m) => {
+      const pl = packing(m.get('packing_list'));
+      if (!pl?.cartons || !pl.totals) return [];
+      if (Math.abs(pl.totals.quantity - pl.totalQuantity) <= CURRENCY_EPSILON) return [];
+      return [finding('pl_packed_qty_matches_goods', 'error', ['packing_list'],
+        `Cartons hold ${pl.totals.quantity} units in total but the goods listed come to ${pl.totalQuantity}.`,
+        'packing_list.totals.quantity')];
+    },
+  },
   // ── Identity: currency, incoterm, consignee uniform across the set ─────────
   {
     id: 'currency_uniform',

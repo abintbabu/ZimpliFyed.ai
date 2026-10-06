@@ -7,7 +7,7 @@ import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { writeDomainEvent } from '@/lib/domain-events';
 import { approveAiInteraction } from '@/ai/approval';
-import { sendWhatsAppTemplate, parseWhatsAppSendPayload, WhatsAppSendError } from '@/lib/whatsapp/send';
+import { sendWhatsAppTemplate, sendWhatsAppSessionMessage, parseWhatsAppSendPayload, parseWhatsAppSessionPayload, WhatsAppSendError } from '@/lib/whatsapp/send';
 import { sendGmailReply, parseGmailReplyPayload, GmailSendError } from '@/lib/inbox/gmail-send';
 import { isFeatureEnabled } from '@/lib/feature-flags';
 import type { Prisma } from '@prisma/client';
@@ -19,7 +19,9 @@ import type { Prisma } from '@prisma/client';
  */
 
 /** Pending items, newest first, grouped-ready for the queue UI. Snoozed items reappear once their time passes. */
-export async function listActionQueue(tenantId: string) {
+export async function listActionQueue() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'action_queue:read')) throw new Error('You do not have permission to view this');
   return prisma.actionQueueItem.findMany({
     where: {
       tenantId,
@@ -83,6 +85,26 @@ export async function approveAction(itemId: string, editedPayload?: Prisma.Input
         reason === 'consent_missing'
           ? `Cannot send: no WhatsApp consent on record for ${waSend.to}. Record consent first, then approve again.`
           : `WhatsApp send failed (${reason}). The action is still pending — fix the issue and approve again.`,
+      );
+    }
+  }
+
+  // WhatsApp session (free-form) reply: same approve-is-send gate, additionally limited to the 24h service window.
+  const waSession = parseWhatsAppSessionPayload(effectivePayload);
+  if (waSession) {
+    try {
+      const { messageId } = await sendWhatsAppSessionMessage({ tenantId, ...waSession });
+      await writeDomainEvent(prisma, { tenantId, type: 'whatsapp.session_sent', refId: item.id, payload: { to: waSession.to, messageId } });
+    } catch (err) {
+      const reason = err instanceof WhatsAppSendError ? err.code : 'unknown_error';
+      const detail = err instanceof Error ? err.message : String(err);
+      await writeAudit({ session, collection: 'action_queue', documentId: item.id, action: 'update', summary: `WhatsApp session send blocked (${reason}): ${item.title} — ${detail}` });
+      throw new Error(
+        reason === 'outside_window'
+          ? `Cannot send a free-form message: ${waSession.to} has not messaged in the last 24 hours. Send an approved template instead.`
+          : reason === 'consent_missing'
+            ? `Cannot send: no WhatsApp consent on record for ${waSession.to}. Record consent first, then approve again.`
+            : `WhatsApp send failed (${reason}). The action is still pending — fix the issue and approve again.`,
       );
     }
   }

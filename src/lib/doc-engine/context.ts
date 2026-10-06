@@ -44,6 +44,19 @@ const LineItemSchema = z.object({
   hsCode: nonEmpty,
 });
 
+// Carton packing data (M2) — optional: a set without it still generates, with the quantity-only packing list.
+const PackingEntrySchema = z.object({
+  description: z.string().nullable().optional(),
+  marks: z.string().nullable().optional(),
+  cartonCount: z.number().int().positive(),
+  qtyPerCarton: z.number().positive(),
+  netWeightKg: z.number().positive(),
+  grossWeightKg: z.number().positive(),
+  lengthCm: z.number().positive(),
+  widthCm: z.number().positive(),
+  heightCm: z.number().positive(),
+});
+
 export const DocContextSchema = z.object({
   tenant: TenantIdentitySchema,
   buyer: BuyerSchema,
@@ -56,6 +69,7 @@ export const DocContextSchema = z.object({
    */
   issuedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Issue date must be YYYY-MM-DD'),
   lines: z.array(LineItemSchema).min(1),
+  packing: z.array(PackingEntrySchema).optional(),
 });
 
 export type DocContext = z.infer<typeof DocContextSchema>;
@@ -113,6 +127,8 @@ export async function buildDocContext(tenantId: string, orderId: string): Promis
       include: {
         buyer: true,
         quote: { include: { lines: { include: { product: { include: { hsCode: true } } } } } },
+        lines: { orderBy: { sortOrder: 'asc' }, include: { product: { include: { hsCode: true } } } },
+        packingEntries: { orderBy: { sortOrder: 'asc' }, include: { orderLine: true } },
       },
     }),
   ]);
@@ -147,14 +163,29 @@ export async function buildDocContext(tenantId: string, orderId: string): Promis
       destPort: order.destPort ?? '',
       destination: order.destination ?? '',
     },
-    currency: order.quote?.currency ?? '',
+    currency: order.currency ?? order.quote?.currency ?? '',
     issuedAt: new Date().toISOString().slice(0, 10),
-    lines: (order.quote?.lines ?? []).map((l) => ({
+    // Order lines are the source of truth (M1). Legacy orders created before order lines existed fall
+    // back to the attached quote's lines; scripts/backfill-order-lines.ts copies them across.
+    lines: (order.lines.length > 0 ? order.lines : (order.quote?.lines ?? [])).map((l) => ({
       description: l.description ?? '',
       quantity: l.quantity,
       unitPrice: l.unitPrice,
-      hsCode: l.product?.hsCode?.hsCode ?? '',
+      hsCode: ('hsCode' in l ? l.hsCode : null) || l.product?.hsCode?.hsCode || '',
     })),
+    packing: order.packingEntries.length
+      ? order.packingEntries.map((p) => ({
+          description: p.orderLine?.description ?? null,
+          marks: p.marks,
+          cartonCount: p.cartonCount,
+          qtyPerCarton: p.qtyPerCarton,
+          netWeightKg: p.netWeightKg,
+          grossWeightKg: p.grossWeightKg,
+          lengthCm: p.lengthCm,
+          widthCm: p.widthCm,
+          heightCm: p.heightCm,
+        }))
+      : undefined,
   };
 
   const parsed = DocContextSchema.safeParse(raw);
@@ -166,10 +197,10 @@ export async function buildDocContext(tenantId: string, orderId: string): Promis
     if (path.startsWith('lines')) {
       const [, indexStr, key] = issue.path as (string | number)[];
       if (typeof indexStr === 'number' && typeof key === 'string') {
-        missing.push({ path, label: lineLabel(indexStr, key), fixHref: order.quote ? `/dashboard/quotes/${order.quote.id}` : orderFixHref });
+        missing.push({ path, label: lineLabel(indexStr, key), fixHref: orderFixHref });
         continue;
       }
-      missing.push({ path: 'lines', label: FIELD_LABELS.lines.label, fixHref: order.quote ? `/dashboard/quotes/${order.quote.id}` : orderFixHref });
+      missing.push({ path: 'lines', label: FIELD_LABELS.lines.label, fixHref: orderFixHref });
       continue;
     }
     const known = FIELD_LABELS[path];

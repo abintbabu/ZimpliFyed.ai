@@ -38,7 +38,7 @@ export async function getOrderPnl(orderId: string) {
           lines: order.quote.costSheet.lines,
         }
       : null,
-    invoices: order.invoices.map((i) => ({ total: i.total, isCreditOrDebitNote: i.isCreditOrDebitNote })),
+    invoices: order.invoices.map((i) => ({ total: i.total, isCreditOrDebitNote: i.isCreditOrDebitNote, noteKind: i.noteKind })),
     incentiveAmounts: incentiveClaims.map((c) => c.amount),
     bookedExpenses: bookedExpenses.map((e) => e.amount!),
   });

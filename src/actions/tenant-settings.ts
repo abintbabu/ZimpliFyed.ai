@@ -7,7 +7,8 @@ import { hasPermission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import type { BusinessType } from '@prisma/client';
 
-export async function getTenantProfile(tenantId: string) {
+export async function getTenantProfile() {
+  const { tenantId } = await requireTenantSession();
   return prisma.tenant.findUnique({
     where: { id: tenantId },
     select: {
@@ -47,7 +48,7 @@ export async function updateTenantProfile(input: {
 }) {
   const session = await requireTenantSession();
   const { tenantId, role } = session;
-  if (!hasPermission(role, 'users:manage')) throw new Error('Only owners and admins can update company settings');
+  if (!hasPermission(role, 'settings:manage')) throw new Error('You do not have permission to update company settings');
   if (!input.name.trim()) throw new Error('Company name is required');
 
   const before = await prisma.tenant.findUnique({ where: { id: tenantId } });

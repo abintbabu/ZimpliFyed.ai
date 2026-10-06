@@ -8,6 +8,7 @@ export type DomainEventType =
   | 'quote.followup_drafted'
   | 'invoice.paid'
   | 'docset.generated'
+  | 'docset.issued'
   | 'milestone.reached'
   | 'billing.subscribed'
   | 'billing.cancelled'
@@ -22,6 +23,8 @@ export type DomainEventType =
   | 'data_export.requested'
   | 'compliance.expiry_alert'
   | 'shipment.delay_alert'
+  | 'lc.deadline_alert'
+  | 'vendor_rfq.quote_received'
   | 'expense.auto_posted'
   | 'expense.needs_review'
   | 'inbox.message_received'
@@ -30,6 +33,7 @@ export type DomainEventType =
   | 'action.approved'
   | 'action.rejected'
   | 'whatsapp.template_sent'
+  | 'whatsapp.session_sent'
   | 'gmail.reply_sent';
 
 /** Minimal event log for key mutations (AI_PLATFORM_SPEC §6). Consumers — onboarding checklist, health score,

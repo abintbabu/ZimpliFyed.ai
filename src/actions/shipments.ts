@@ -22,7 +22,9 @@ async function ownedShipment(tenantId: string, shipmentId: string) {
 
 const text = (v?: string | null) => v?.trim() || null;
 
-export async function listShipments(tenantId: string) {
+export async function listShipments() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'orders:read')) throw new Error('You do not have permission to view this');
   return prisma.shipment.findMany({
     where: { tenantId },
     include: { orders: { include: { order: { select: { id: true, orderNumber: true } } } }, containers: { select: { id: true } } },
@@ -30,7 +32,9 @@ export async function listShipments(tenantId: string) {
   });
 }
 
-export async function getShipment(tenantId: string, shipmentId: string) {
+export async function getShipment(shipmentId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'orders:read')) throw new Error('You do not have permission to view this');
   return prisma.shipment.findFirst({
     where: { id: shipmentId, tenantId },
     include: {
@@ -41,7 +45,9 @@ export async function getShipment(tenantId: string, shipmentId: string) {
   });
 }
 
-export async function listShipmentsForOrder(tenantId: string, orderId: string) {
+export async function listShipmentsForOrder(orderId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'orders:read')) throw new Error('You do not have permission to view this');
   return prisma.shipment.findMany({
     where: { tenantId, orders: { some: { orderId } } },
     select: { id: true, shipmentNumber: true, status: true },
@@ -185,10 +191,14 @@ export async function addFreightQuote(shipmentId: string, input: {
   const forwarderName = input.forwarderName.trim();
   if (!forwarderName) throw new Error('Forwarder name is required');
 
+  // Link to the forwarder master when the name matches one (case-insensitive); otherwise it stays free text.
+  const master = await prisma.forwarder.findFirst({ where: { tenantId: session.tenantId, name: { equals: forwarderName, mode: 'insensitive' } }, select: { id: true } });
+
   await prisma.freightQuote.create({
     data: {
       tenantId: session.tenantId,
       shipmentId: shipment.id,
+      forwarderId: master?.id ?? null,
       forwarderName,
       mode: input.mode,
       currency: input.currency?.trim().toUpperCase() || 'USD',

@@ -8,6 +8,20 @@ export const DEFAULT_MARGIN_PCT = 20;
 /** Below this margin%, quote creation is soft-blocked — only an admin/super_admin can override. */
 export const MARGIN_FLOOR_PCT = 10;
 
+/**
+ * The margin floor for one buyer: their own policy when set, otherwise the global floor. A buyer policy
+ * replaces the global floor in both directions — a strategic account may be allowed thinner, a risky one
+ * held higher — because the owner set it deliberately.
+ */
+export function effectiveMarginFloor(buyerMinMarginPct: number | null | undefined): number {
+  return buyerMinMarginPct != null && buyerMinMarginPct >= 0 && buyerMinMarginPct < 100 ? buyerMinMarginPct : MARGIN_FLOOR_PCT;
+}
+
+/** The default margin for new lines: the buyer's target when set, otherwise the global default. */
+export function effectiveDefaultMargin(buyerTargetMarginPct: number | null | undefined): number {
+  return buyerTargetMarginPct != null && buyerTargetMarginPct >= 0 && buyerTargetMarginPct < 100 ? buyerTargetMarginPct : DEFAULT_MARGIN_PCT;
+}
+
 /** Price = cost marked up by expense%, then margin-on-price applied. */
 export function priceFromCostAndMargin(costPerUnit: number, marginPct: number): number {
   if (marginPct >= 100) return costPerUnit; // guard: 100% margin-on-price is undefined
@@ -52,12 +66,13 @@ type CostedLine = {
  */
 export function withDefaultExpenseMargin<T extends CostedLine>(
   items: T[],
+  defaultMarginPct: number = DEFAULT_MARGIN_PCT,
 ): (T & { expensePct?: number; marginPct?: number })[] {
   return items.map(li => {
     if (li.cost == null || li.cost <= 0) return li;
     if (li.expensePct != null && li.marginPct != null) return li;
     const expensePct = li.expensePct ?? DEFAULT_EXPENSE_PCT;
-    const marginPct = li.marginPct ?? DEFAULT_MARGIN_PCT;
+    const marginPct = li.marginPct ?? defaultMarginPct;
     const unitPrice = computeSellPrice(li.cost, expensePct, marginPct);
     return { ...li, expensePct, marginPct, unitPrice, lineTotal: parseFloat((li.quantity * unitPrice).toFixed(2)) };
   });

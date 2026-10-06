@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { saveCostSheet } from '@/actions/cost-sheets';
-import { computeLandedCost, INCOTERMS } from '@/lib/landed-cost';
+import { saveCostSheet, suggestFreightForQuote, suggestCostsForQuote } from '@/actions/cost-sheets';
+import { computeLandedCost, priceForTargetMargin, INCOTERMS } from '@/lib/landed-cost';
 import type { CostCategory } from '@prisma/client';
 
 const CATEGORY_LABELS: Record<CostCategory, string> = {
@@ -17,6 +17,9 @@ const CATEGORY_LABELS: Record<CostCategory, string> = {
   finance_cost: 'Finance cost',
   duties: 'Duties',
   other: 'Other',
+  commission: 'Agent commission',
+  bank_charges: 'Bank charges',
+  documentation: 'Documentation charges',
 };
 
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as CostCategory[];
@@ -54,6 +57,9 @@ export function CostSheetPanel({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [targetMargin, setTargetMargin] = useState(20);
+  const [historyNote, setHistoryNote] = useState<string[] | null>(null);
+  const [freightNote, setFreightNote] = useState<{ tone: 'ok' | 'warn'; lines: string[] } | null>(null);
 
   const result = useMemo(
     () => computeLandedCost({ incoterm, sellPricePerUnit, rodtepPct, lines }),
@@ -68,6 +74,56 @@ export function CostSheetPanel({
   function removeLine(id: string) {
     setLines((prev) => prev.filter((l) => l.id !== id));
     setSaved(false);
+  }
+
+  /** Merges the accepted-forwarder-quote freight into the freight line (replacing a previous pull). Not saved until the user saves. */
+  function pullAcceptedFreight() {
+    setFreightNote(null);
+    startTransition(async () => {
+      const s = await suggestFreightForQuote(quoteId);
+      if ('unavailable' in s) { setFreightNote({ tone: 'warn', lines: [s.unavailable] }); return; }
+      if (s.perUnit == null) { setFreightNote({ tone: 'warn', lines: s.problems }); return; }
+      const label = `Freight — ${s.sources.map((x) => `${x.forwarderName} (${x.shipmentNumber})`).join(', ')}`;
+      setLines((prev) => {
+        const existing = prev.find((l) => l.category === 'freight' && l.label.startsWith('Freight —'));
+        if (existing) return prev.map((l) => (l.id === existing.id ? { ...l, label, amountPerUnit: s.perUnit! } : l));
+        return [...prev, { ...newLine('freight'), label, amountPerUnit: s.perUnit! }];
+      });
+      setSaved(false);
+      setFreightNote({
+        tone: s.problems.length ? 'warn' : 'ok',
+        lines: [
+          `Added ${s.targetCurrency} ${s.perUnit.toFixed(2)}/unit (${s.targetCurrency} ${s.totalShare.toFixed(2)} share of ${s.sources.map((x) => x.quoted).join(' + ')}). Review, then save.`,
+          ...s.problems,
+        ],
+      });
+    });
+  }
+
+  /** Fills EMPTY cost heads from history; never overwrites a figure the user already entered. */
+  function suggestFromHistory() {
+    setHistoryNote(null);
+    startTransition(async () => {
+      const r = await suggestCostsForQuote(quoteId, incoterm);
+      if ('unavailable' in r) { setHistoryNote([r.unavailable]); return; }
+      if (r.suggestions.length === 0) { setHistoryNote(['Not enough history yet — suggestions need at least 2 earlier cost sheets in the same currency.']); return; }
+      const notes: string[] = [];
+      setLines((prev) => {
+        const next = [...prev];
+        for (const s of r.suggestions) {
+          const existing = next.find((l) => l.category === s.category && l.amountPerUnit > 0);
+          if (existing) continue;
+          const blank = next.find((l) => l.category === s.category && l.amountPerUnit === 0);
+          const label = `Suggested · median of ${s.samples} (${s.min}–${s.max}), ${s.confidence} confidence`;
+          if (blank) { blank.amountPerUnit = s.amountPerUnit; blank.label = blank.label || label; }
+          else next.push({ ...newLine(s.category), label, amountPerUnit: s.amountPerUnit });
+          notes.push(`${CATEGORY_LABELS[s.category]}: ${r.currency} ${s.amountPerUnit.toFixed(2)} from ${s.samples} past sheets`);
+        }
+        return next;
+      });
+      setSaved(false);
+      setHistoryNote(notes.length ? [...notes, 'Review each figure, then save.'] : ['Every cost head already has a figure — nothing to fill.']);
+    });
   }
 
   function save() {
@@ -167,6 +223,23 @@ export function CostSheetPanel({
         </button>
       )}
 
+      {canWrite && (
+        <div className="mt-1 space-y-1">
+          <button onClick={suggestFromHistory} disabled={pending} className="block text-xs font-medium text-brand hover:underline disabled:opacity-50">
+            ↳ Suggest empty heads from my past cost sheets
+          </button>
+          {historyNote && <ul role="status" className="space-y-0.5 text-xs text-ink-soft">{historyNote.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+          <button onClick={pullAcceptedFreight} disabled={pending} className="text-xs font-medium text-brand hover:underline disabled:opacity-50">
+            ↳ Use accepted freight quote
+          </button>
+          {freightNote && (
+            <ul role="status" className={`mt-1 space-y-0.5 text-xs ${freightNote.tone === 'ok' ? 'text-green-700' : 'text-amber-800'}`}>
+              {freightNote.lines.map((l, i) => <li key={i}>{l}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+
       {result.excludedLines.length > 0 && (
         <p className="mt-3 text-xs text-muted">
           {result.excludedLines.length} line(s) excluded from cost under {incoterm} (not seller-borne at this Incoterm).
@@ -177,6 +250,11 @@ export function CostSheetPanel({
         <div><p className="text-xs text-muted">Gross cost/unit</p><p className="text-ink">{result.grossCostPerUnit.toFixed(2)}</p></div>
         <div><p className="text-xs text-muted">RoDTEP credit/unit</p><p className="text-ink">{result.rodtepCreditPerUnit.toFixed(2)}</p></div>
         <div><p className="text-xs text-muted">Landed cost/unit</p><p className="font-semibold text-ink">{result.landedCostPerUnit.toFixed(2)}</p></div>
+        <div><p className="text-xs text-muted">Break-even price/unit</p><p className="text-ink">{result.breakEvenPricePerUnit.toFixed(2)}</p></div>
+        <div>
+          <p className="text-xs text-muted">Price for <input aria-label="Target margin %" type="number" min={0} max={99} value={targetMargin} onChange={(e) => setTargetMargin(Number(e.target.value))} className="w-12 rounded border border-line px-1 text-xs" />% margin</p>
+          <p className="text-ink">{priceForTargetMargin(result.landedCostPerUnit, targetMargin)?.toFixed(2) ?? '—'}</p>
+        </div>
         <div>
           <p className="text-xs text-muted">Landed margin</p>
           <p className={`font-semibold ${result.landedMarginPct != null && result.landedMarginPct < 0 ? 'text-red-600' : 'text-green-700'}`}>

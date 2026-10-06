@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { getCredential } from '@/lib/crypto/vault';
+import { sessionWindow } from '@/lib/whatsapp-window';
 
 /**
  * WhatsApp Cloud API outbound — template sends only (ROADMAP §7 item 3; CPO decision 2026-08-31:
@@ -14,7 +15,7 @@ import { getCredential } from '@/lib/crypto/vault';
  * `consent_missing`; callers surface that, they never bypass it.
  */
 
-export type WhatsAppSendErrorCode = 'consent_missing' | 'no_credential' | 'bad_credential' | 'api_error';
+export type WhatsAppSendErrorCode = 'consent_missing' | 'no_credential' | 'bad_credential' | 'api_error' | 'outside_window' | 'bad_message';
 
 export class WhatsAppSendError extends Error {
   constructor(
@@ -45,34 +46,51 @@ export interface SendWhatsAppTemplateInput {
 
 const GRAPH_VERSION = 'v21.0';
 
+/** Hard DPDP gate — consent is checked here so no caller can forget it. */
+async function requireConsent(tenantId: string, to: string) {
+  const consent = await prisma.consentRecord.findUnique({
+    where: { tenantId_channel_identifier: { tenantId, channel: 'whatsapp', identifier: to } },
+    select: { status: true },
+  });
+  if (!consent || consent.status !== 'granted') {
+    throw new WhatsAppSendError('consent_missing', `No granted WhatsApp consent on record for ${to}`);
+  }
+}
+
+async function loadCredential(tenantId: string, account: string): Promise<WhatsAppCredential> {
+  const secret = await getCredential({ tenantId, kind: 'whatsapp', account });
+  if (!secret) throw new WhatsAppSendError('no_credential', 'No active WhatsApp credential is connected for this workspace');
+  try {
+    const cred = JSON.parse(secret) as WhatsAppCredential;
+    if (!cred.accessToken || !cred.phoneNumberId) throw new Error('missing fields');
+    return cred;
+  } catch {
+    throw new WhatsAppSendError('bad_credential', 'Stored WhatsApp credential is malformed');
+  }
+}
+
+async function postMessage(cred: WhatsAppCredential, body: unknown): Promise<{ messageId: string }> {
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${cred.phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${cred.accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new WhatsAppSendError('api_error', `WhatsApp API ${res.status}: ${detail.slice(0, 500)}`);
+  }
+  const json = (await res.json()) as { messages?: { id?: string }[] };
+  return { messageId: json.messages?.[0]?.id ?? 'unknown' };
+}
+
 /**
  * Send a WhatsApp template message via the Meta Cloud API `/messages` endpoint.
  * Throws {@link WhatsAppSendError} on missing consent, missing/corrupt credential, or API failure.
  * Returns the Meta message id (wamid) on success.
  */
 export async function sendWhatsAppTemplate(input: SendWhatsAppTemplateInput): Promise<{ messageId: string }> {
-  // Hard DPDP gate — consent is checked here so no caller can forget it.
-  const consent = await prisma.consentRecord.findUnique({
-    where: {
-      tenantId_channel_identifier: { tenantId: input.tenantId, channel: 'whatsapp', identifier: input.to },
-    },
-    select: { status: true },
-  });
-  if (!consent || consent.status !== 'granted') {
-    throw new WhatsAppSendError('consent_missing', `No granted WhatsApp consent on record for ${input.to}`);
-  }
-
-  const secret = await getCredential({ tenantId: input.tenantId, kind: 'whatsapp', account: input.account ?? '' });
-  if (!secret) {
-    throw new WhatsAppSendError('no_credential', 'No active WhatsApp credential is connected for this workspace');
-  }
-  let cred: WhatsAppCredential;
-  try {
-    cred = JSON.parse(secret) as WhatsAppCredential;
-    if (!cred.accessToken || !cred.phoneNumberId) throw new Error('missing fields');
-  } catch {
-    throw new WhatsAppSendError('bad_credential', 'Stored WhatsApp credential is malformed');
-  }
+  await requireConsent(input.tenantId, input.to);
+  const cred = await loadCredential(input.tenantId, input.account ?? '');
 
   const body = {
     messaging_product: 'whatsapp',
@@ -91,18 +109,7 @@ export async function sendWhatsAppTemplate(input: SendWhatsAppTemplateInput): Pr
     },
   };
 
-  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${cred.phoneNumberId}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${cred.accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    throw new WhatsAppSendError('api_error', `WhatsApp API ${res.status}: ${detail.slice(0, 500)}`);
-  }
-  const json = (await res.json()) as { messages?: { id?: string }[] };
-  return { messageId: json.messages?.[0]?.id ?? 'unknown' };
+  return postMessage(cred, body);
 }
 
 /** Parse an ActionQueueItem payload into a template-send input, or null if it isn't a WhatsApp send. */
@@ -120,4 +127,48 @@ export function parseWhatsAppSendPayload(
     bodyParams: Array.isArray(p.bodyParams) ? p.bodyParams.map(String) : undefined,
     account: typeof p.account === 'string' ? p.account : undefined,
   };
+}
+
+export interface SendWhatsAppSessionInput {
+  tenantId: string;
+  /** Recipient, E.164 digits without "+". */
+  to: string;
+  text: string;
+  account?: string;
+}
+
+const MAX_SESSION_TEXT = 4096;
+
+/**
+ * Free-form (session) message. Meta only permits these within 24 hours of the customer's last inbound
+ * message; outside that window only an approved template may be sent, and this throws `outside_window` rather
+ * than letting the API reject it. The consent gate and the action-queue approval both still apply.
+ */
+export async function sendWhatsAppSessionMessage(input: SendWhatsAppSessionInput): Promise<{ messageId: string }> {
+  const text = input.text.trim();
+  if (!text) throw new WhatsAppSendError('bad_message', 'The message is empty');
+  if (text.length > MAX_SESSION_TEXT) throw new WhatsAppSendError('bad_message', `The message is over ${MAX_SESSION_TEXT} characters`);
+
+  await requireConsent(input.tenantId, input.to);
+
+  const last = await prisma.inboxMessage.findFirst({
+    where: { tenantId: input.tenantId, channel: { kind: 'whatsapp' }, fromAddress: { in: [input.to, `+${input.to}`] } },
+    orderBy: { receivedAt: 'desc' },
+    select: { receivedAt: true },
+  });
+  if (!sessionWindow(last?.receivedAt ?? null, new Date()).open) {
+    throw new WhatsAppSendError('outside_window', `${input.to} has not messaged in the last 24 hours — only an approved template can be sent`);
+  }
+
+  const cred = await loadCredential(input.tenantId, input.account ?? '');
+  return postMessage(cred, { messaging_product: 'whatsapp', to: input.to, type: 'text', text: { body: text, preview_url: false } });
+}
+
+/** Parse an ActionQueueItem payload into a session-message input, or null if it isn't one. */
+export function parseWhatsAppSessionPayload(payload: unknown): Omit<SendWhatsAppSessionInput, 'tenantId'> | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const p = payload as Record<string, unknown>;
+  if (p.channel !== 'whatsapp' || typeof p.template === 'string') return null;
+  if (typeof p.to !== 'string' || !/^\d{8,15}$/.test(p.to) || typeof p.text !== 'string') return null;
+  return { to: p.to, text: p.text, account: typeof p.account === 'string' ? p.account : undefined };
 }

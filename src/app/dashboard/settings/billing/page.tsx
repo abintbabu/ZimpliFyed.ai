@@ -18,8 +18,8 @@ function daysUntil(date: Date | null | undefined): number | null {
 }
 
 export default async function BillingPage() {
-  const s = await requireTenantSession();
-  if (!hasPermission(s.role, 'users:manage')) {
+  const s = await requireTenantSession({ allowSuspended: true });
+  if (!hasPermission(s.role, 'billing:manage')) {
     return <p className="text-sm text-muted">Only owners and admins can manage billing.</p>;
   }
 

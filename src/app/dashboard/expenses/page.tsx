@@ -9,10 +9,10 @@ import { SnapExpenseForm } from './snap-expense-form';
 import { ExpenseReviewList } from './expense-review-list';
 
 export default async function ExpensesPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'expenses:read')) redirect('/dashboard');
 
-  const [expenses, orders] = await Promise.all([listExpenses(tenantId), listOrders(tenantId)]);
+  const [expenses, orders] = await Promise.all([listExpenses(), listOrders()]);
   const canWrite = hasPermission(role, 'expenses:write');
 
   const pendingCount = expenses.filter((e) => e.status === 'pending_review').length;

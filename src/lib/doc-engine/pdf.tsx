@@ -2,6 +2,7 @@ import 'server-only';
 import React from 'react';
 import { Document, Page, Text, View, renderToBuffer } from '@react-pdf/renderer';
 import type { DocModel, DocHeader, BankDetails, InvoiceLine, PackingLine } from './models';
+import type { PackingCartonRow, PackingTotals } from '@/lib/packing';
 
 /**
  * PDF render layer (DOC_ENGINE_SPEC §1.2) — `DocModel → PDF bytes`, the production counterpart to the
@@ -288,6 +289,47 @@ function PackingTable({ lines, totalQuantity, accent }: { lines: PackingLine[]; 
   );
 }
 
+function CartonTable({ cartons, totals, accent }: { cartons: PackingCartonRow[]; totals: PackingTotals; accent: string }) {
+  const w = { no: TW * 0.1, marks: TW * 0.13, goods: TW * 0.2, ctn: TW * 0.08, net: TW * 0.11, gross: TW * 0.11, dim: TW * 0.15, cbm: TW * 0.12 };
+  return (
+    <View style={{ marginTop: 10 }}>
+      <SectionHeader title="CARTON DETAILS" accent={accent} />
+      <View style={{ borderWidth: 0.5, borderTopWidth: 0, borderColor: LINE }}>
+        <View style={{ flexDirection: 'row', backgroundColor: CANVAS, borderBottomWidth: 0.5, borderBottomColor: LINE }}>
+          <Th text="Carton nos." width={w.no} />
+          <Th text="Marks" width={w.marks} />
+          <Th text="Goods" width={w.goods} />
+          <Th text="Ctns" width={w.ctn} align="right" />
+          <Th text="Net kg" width={w.net} align="right" />
+          <Th text="Gross kg" width={w.gross} align="right" />
+          <Th text="L×W×H cm" width={w.dim} align="right" />
+          <Th text="CBM" width={w.cbm} align="right" />
+        </View>
+        {cartons.map((c, i) => (
+          <View key={i} wrap={false} style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: LINE }}>
+            <Td text={c.cartonRange} width={w.no} mono />
+            <Td text={c.marks ?? ''} width={w.marks} />
+            <Td text={c.description ?? ''} width={w.goods} />
+            <Td text={qty(c.cartonCount)} width={w.ctn} align="right" />
+            <Td text={c.totalNetKg.toFixed(2)} width={w.net} align="right" />
+            <Td text={c.totalGrossKg.toFixed(2)} width={w.gross} align="right" />
+            <Td text={`${c.lengthCm}×${c.widthCm}×${c.heightCm}`} width={w.dim} align="right" />
+            <Td text={c.totalCbm.toFixed(3)} width={w.cbm} align="right" />
+          </View>
+        ))}
+        <View style={{ flexDirection: 'row', borderTopWidth: 1.5, borderTopColor: INK, backgroundColor: CANVAS }}>
+          <Td text="Total" width={w.no + w.marks + w.goods} align="right" bold />
+          <Td text={qty(totals.cartons)} width={w.ctn} align="right" bold />
+          <Td text={totals.netWeightKg.toFixed(2)} width={w.net} align="right" bold />
+          <Td text={totals.grossWeightKg.toFixed(2)} width={w.gross} align="right" bold />
+          <Td text="" width={w.dim} />
+          <Td text={totals.cbm.toFixed(3)} width={w.cbm} align="right" bold />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function BankingDetails({ bank, accent }: { bank: BankDetails; accent: string }) {
   const lW = TW * 0.18;
   const vW = TW * 0.32;
@@ -389,6 +431,9 @@ function DocumentPage({ model, branding }: { model: DocModel; branding?: PdfBran
 
       {model.type === 'packing_list' && (
         <PackingTable lines={model.body.lines} totalQuantity={model.body.totalQuantity} accent={accent} />
+      )}
+      {model.type === 'packing_list' && model.body.cartons && model.body.totals && (
+        <CartonTable cartons={model.body.cartons} totals={model.body.totals} accent={accent} />
       )}
 
       {model.type === 'certificate_of_origin' && (

@@ -2,24 +2,46 @@ import { prisma } from '../src/lib/prisma';
 import { writeDomainEvent } from '../src/lib/domain-events';
 import { enqueueAction } from '../src/lib/action-queue';
 import { draftBuyerFollowup } from '../src/lib/ai/buyer-followup';
+import { dueCadenceStep, parseCadence, type CadenceStep, type CadenceKind } from '../src/lib/cadence';
 
 /**
  * Quote follow-up cadence engine v1 (DEV_PLAN_100 Sprint 5, L1 autonomy).
  *
- * Off DomainEvents: for each `quote.sent` that's been silent for >= FOLLOWUP_AFTER_DAYS and whose quote is
- * still in `sent` (not accepted/declined/expired), the AI drafts a nudge and it lands as an OPEN Task for a
- * human to review and send. It is never auto-sent — L1 means drafted-for-approval.
+ * Off DomainEvents: for each `quote.sent` whose quote is still in `sent` (not accepted/declined/expired), the
+ * next DUE step of the tenant's cadence (default: day-3 nudge, day-7 re-quote, day-90 reactivation — see
+ * src/lib/cadence.ts) is drafted by the AI and lands in the Action Queue for a human to review and send. It is
+ * never auto-sent — L1 means drafted-for-approval.
  *
  * Run nightly (same convention as billing/compliance sweeps: Postgres table + polling, no queue infra). Needs
  * the react-server condition because it calls runAi via draftBuyerFollowup:
  *   tsx --conditions=react-server scripts/quote-followup-sweep.ts
  *
- * Dedup: one draft per quote.sent event — a `quote.followup_drafted` DomainEvent (refId = quote id) marks a
- * quote as already nudged, so re-running the sweep never double-drafts.
+ * Dedup: each drafted step writes a `quote.followup_drafted` DomainEvent (refId = quote id); their count is the
+ * cadence position, and the action's dedupeKey includes the step index, so re-running never double-drafts.
  */
 
-const FOLLOWUP_AFTER_DAYS = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Quotes sent longer ago than this are no longer chased (the default cadence ends at day 90). */
+const LOOKBACK_DAYS = 400;
+
+// The cadence is a per-tenant setting (TenantSettings.commercial.followupCadence); absent or malformed → the default
+// day-3 nudge / day-7 re-quote / day-90 reactivation.
+const cadenceCache = new Map<string, CadenceStep[]>();
+async function cadenceFor(tenantId: string): Promise<CadenceStep[]> {
+  const hit = cadenceCache.get(tenantId);
+  if (hit) return hit;
+  const settings = await prisma.tenantSettings.findUnique({ where: { tenantId }, select: { commercial: true } });
+  const raw = (settings?.commercial as { followupCadence?: unknown } | null)?.followupCadence;
+  const cadence = parseCadence(raw);
+  cadenceCache.set(tenantId, cadence);
+  return cadence;
+}
+
+const INSTRUCTION: Record<CadenceKind, string> = {
+  nudge: 'Draft a short, friendly follow-up nudging for a response, without being pushy.',
+  requote: 'The first nudge went unanswered. Draft a short message offering to revisit the price, quantity or terms, and asking what is holding up a decision.',
+  reactivate: 'This quote went quiet long ago. Draft a brief, low-pressure check-in that keeps the door open and asks whether the requirement is still live.',
+};
 
 async function findAssignee(tenantId: string) {
   const membership =
@@ -33,12 +55,12 @@ async function findAssignee(tenantId: string) {
 }
 
 async function sweepQuoteFollowups() {
-  const cutoff = new Date(Date.now() - FOLLOWUP_AFTER_DAYS * DAY_MS);
+  const since = new Date(Date.now() - LOOKBACK_DAYS * DAY_MS);
   // Nightly sweep across ALL tenants by design — each event's own tenantId scopes its downstream
   // processing (see the rest of this loop).
   // tenant-safe: cross-tenant sweep by design
   const sentEvents = await prisma.domainEvent.findMany({
-    where: { type: 'quote.sent', createdAt: { lte: cutoff } },
+    where: { type: 'quote.sent', createdAt: { gte: since } },
     orderBy: { createdAt: 'asc' },
   });
 
@@ -47,18 +69,18 @@ async function sweepQuoteFollowups() {
     if (!event.refId) continue;
     const quoteId = event.refId;
 
-    // Already nudged for this send? Skip.
-    const already = await prisma.domainEvent.findFirst({
-      where: { tenantId: event.tenantId, type: 'quote.followup_drafted', refId: quoteId },
-    });
-    if (already) continue;
-
     const quote = await prisma.quote.findFirst({
       where: { id: quoteId, tenantId: event.tenantId },
       include: { buyer: true, lines: true },
     });
-    // Only nudge a quote that is still awaiting a response.
+    // Only chase a quote that is still awaiting a response; accepted / declined / expired ends the cadence.
     if (!quote || quote.status !== 'sent') continue;
+
+    // Steps already drafted for this quote = the cadence position. Only the EARLIEST unhandled step is ever
+    // due, so a long-quiet quote gets one draft per run, never a burst of catch-up messages.
+    const stepsDone = await prisma.domainEvent.count({ where: { tenantId: event.tenantId, type: 'quote.followup_drafted', refId: quoteId } });
+    const due = dueCadenceStep({ anchor: event.createdAt, stepsDone, now: new Date(), cadence: await cadenceFor(event.tenantId) });
+    if (!due) continue;
 
     const assignee = await findAssignee(event.tenantId);
     if (!assignee) continue;
@@ -68,7 +90,7 @@ async function sweepQuoteFollowups() {
       `Quote ${quote.quoteNumber} was sent to ${quote.buyer?.name ?? 'the buyer'} ${daysSilent} days ago with no reply.`,
       `Value: ${quote.currency} ${quote.total.toFixed(2)}.`,
       `Items: ${quote.lines.map((l) => `${l.quantity} x ${l.description}`).join('; ') || 'n/a'}.`,
-      `Draft a short, friendly follow-up nudging for a response, without being pushy.`,
+      INSTRUCTION[due.step.kind],
     ].join('\n');
 
     let draft: { subject: string; body: string };
@@ -86,12 +108,12 @@ async function sweepQuoteFollowups() {
       tenantId: event.tenantId,
       kind: 'send_followup',
       department: 'SELL',
-      title: `Follow up on ${quote.quoteNumber} — ${quote.buyer?.name ?? 'buyer'}`,
+      title: `${due.step.kind === 'requote' ? 'Re-quote' : due.step.kind === 'reactivate' ? 'Check in on' : 'Follow up on'} ${quote.quoteNumber} — ${quote.buyer?.name ?? 'buyer'}`,
       summary: draft.subject,
       payload: { subject: draft.subject, body: draft.body },
       linkedType: 'quote',
       linkedId: quoteId,
-      dedupeKey: `send_followup:quote:${quoteId}`,
+      dedupeKey: `send_followup:quote:${quoteId}:${due.index}`,
       aiInteractionId: interactionId,
     });
 
@@ -112,11 +134,11 @@ async function sweepQuoteFollowups() {
           createdByUserId: assignee.userId,
         },
       });
-      await writeDomainEvent(tx, { tenantId: event.tenantId, type: 'quote.followup_drafted', refId: quoteId, payload: { quoteNumber: quote.quoteNumber, daysSilent } });
+      await writeDomainEvent(tx, { tenantId: event.tenantId, type: 'quote.followup_drafted', refId: quoteId, payload: { quoteNumber: quote.quoteNumber, daysSilent, step: due.index, kind: due.step.kind } });
     });
 
     drafted += 1;
-    console.log(`[followup] ${quote.quoteNumber}: drafted nudge (silent ${daysSilent}d)`);
+    console.log(`[followup] ${quote.quoteNumber}: drafted ${due.step.kind} (step ${due.index + 1}, silent ${daysSilent}d)`);
   }
 
   console.log(`Quote follow-up sweep done: ${drafted} nudge(s) drafted from ${sentEvents.length} sent quote(s).`);

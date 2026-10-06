@@ -3,13 +3,16 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireTenantSession } from '@/lib/session-tenant';
-import { hasPermission } from '@/lib/permissions';
+import { hasPermission, type Permission } from '@/lib/permissions';
 import { writeAudit } from '@/lib/audit';
 import { draftBuyerFollowup } from '@/lib/ai/buyer-followup';
 import { enqueueAction } from '@/lib/action-queue';
+import { evaluateCredit, type CreditCheckResult } from '@/lib/credit-exposure';
 import type { ActivityKind } from '@prisma/client';
 
-export async function listBuyers(tenantId: string) {
+export async function listBuyers() {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'customers:read')) throw new Error('You do not have permission to view this');
   return prisma.buyer.findMany({
     where: { tenantId },
     include: { contacts: true, _count: { select: { quotes: true, orders: true } } },
@@ -17,7 +20,9 @@ export async function listBuyers(tenantId: string) {
   });
 }
 
-export async function getBuyer(tenantId: string, buyerId: string) {
+export async function getBuyer(buyerId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'customers:read')) throw new Error('You do not have permission to view this');
   return prisma.buyer.findFirst({
     where: { id: buyerId, tenantId },
     include: {
@@ -29,7 +34,9 @@ export async function getBuyer(tenantId: string, buyerId: string) {
   });
 }
 
-export async function listBuyerActivity(tenantId: string, buyerId: string) {
+export async function listBuyerActivity(buyerId: string) {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'customers:read')) throw new Error('You do not have permission to view this');
   return prisma.activity.findMany({
     where: { tenantId, entityType: 'buyer', entityId: buyerId },
     orderBy: { createdAt: 'desc' },
@@ -184,6 +191,17 @@ export async function createContact(input: {
   return contact;
 }
 
+/**
+ * Activity rows hang off three different records, so the permission depends on which. Gating all
+ * three on `customers:write` would stop Logistics logging a call against an order; gating on none
+ * let any member write into another team's CRM timeline.
+ */
+const ACTIVITY_WRITE_PERMISSION = {
+  buyer: 'customers:write',
+  lead: 'leads:write',
+  order: 'orders:write',
+} as const satisfies Record<'buyer' | 'lead' | 'order', Permission>;
+
 export async function createActivity(input: {
   entityType: 'buyer' | 'lead' | 'order';
   entityId: string;
@@ -193,7 +211,10 @@ export async function createActivity(input: {
   dueAt?: Date;
 }) {
   const session = await requireTenantSession();
-  const { tenantId, userId } = session;
+  const { tenantId, userId, role } = session;
+  if (!hasPermission(role, ACTIVITY_WRITE_PERMISSION[input.entityType])) {
+    throw new Error('You do not have permission to log activity on this record');
+  }
 
   const activity = await prisma.activity.create({
     data: {
@@ -213,9 +234,14 @@ export async function createActivity(input: {
 }
 
 export async function completeActivity(activityId: string) {
-  const { tenantId } = await requireTenantSession();
+  const { tenantId, role } = await requireTenantSession();
   const activity = await prisma.activity.findFirst({ where: { id: activityId, tenantId } });
   if (!activity) throw new Error('Activity not found');
+  // Resolved from the stored row's entityType, never from caller input.
+  const needed = ACTIVITY_WRITE_PERMISSION[activity.entityType as keyof typeof ACTIVITY_WRITE_PERMISSION];
+  if (!needed || !hasPermission(role, needed)) {
+    throw new Error('You do not have permission to complete activity on this record');
+  }
 
   await prisma.activity.update({ where: { id: activityId }, data: { doneAt: new Date() } }); // tenant-safe: activityId verified tenant-owned via findFirst above
   if (activity.entityType === 'buyer') revalidatePath(`/dashboard/buyers/${activity.entityId}`);
@@ -274,4 +300,55 @@ export async function draftBuyerFollowupAction(buyerId: string) {
   });
 
   return { ...draft, interactionId };
+}
+
+/**
+ * Credit-limit check for a buyer against an amount about to be committed (a quote or order total).
+ * Warn-only by design: callers surface the result, nothing is blocked. Exposure is the buyer's unpaid
+ * balance on live (sent / partially paid / overdue) non-credit-note invoices — drafts are not yet owed.
+ */
+export async function checkBuyerCredit(buyerId: string, amount: number, currency: string): Promise<CreditCheckResult | null> {
+  const { tenantId, role } = await requireTenantSession();
+  if (!hasPermission(role, 'customers:read')) return null;
+
+  const buyer = await prisma.buyer.findFirst({ where: { id: buyerId, tenantId } });
+  if (!buyer) return null;
+
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      tenantId,
+      isDemo: false,
+      isCreditOrDebitNote: false,
+      status: { in: ['sent', 'partially_paid', 'overdue'] },
+      balanceDue: { gt: 0.01 },
+      order: { buyerId },
+    },
+    select: { currency: true, balanceDue: true },
+  });
+
+  return evaluateCredit({
+    creditLimit: buyer.creditLimit,
+    limitCurrency: buyer.currencyDefault,
+    openBalances: invoices,
+    newAmount: amount,
+    newAmountCurrency: currency,
+  });
+}
+
+/** Per-buyer margin policy: the floor below which quotes need an admin override, and the default margin for new lines. */
+export async function setBuyerMarginPolicy(buyerId: string, input: { minMarginPct: number | null; targetMarginPct: number | null }) {
+  const session = await requireTenantSession();
+  const { tenantId, role } = session;
+  if (!hasPermission(role, 'customers:write')) throw new Error('You do not have permission to change buyer terms');
+  for (const [k, v] of Object.entries(input)) {
+    if (v != null && !(v >= 0 && v < 100)) throw new Error(`${k === 'minMarginPct' ? 'Minimum' : 'Target'} margin must be between 0 and 99.`);
+  }
+  if (input.minMarginPct != null && input.targetMarginPct != null && input.targetMarginPct < input.minMarginPct) {
+    throw new Error('The target margin cannot be below the minimum margin.');
+  }
+  const buyer = await prisma.buyer.findFirst({ where: { id: buyerId, tenantId }, select: { id: true, name: true } });
+  if (!buyer) throw new Error('Buyer not found');
+  await prisma.buyer.update({ where: { id: buyerId, tenantId }, data: { minMarginPct: input.minMarginPct, targetMarginPct: input.targetMarginPct } });
+  await writeAudit({ session, collection: 'buyers', documentId: buyerId, action: 'pricing_change', summary: `Margin policy for ${buyer.name}: min ${input.minMarginPct ?? 'default'}%, target ${input.targetMarginPct ?? 'default'}%`, after: input });
+  revalidatePath(`/dashboard/buyers/${buyerId}`);
 }

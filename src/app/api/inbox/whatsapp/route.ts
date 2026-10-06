@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { enqueue } from '@/lib/jobs/queue';
 import { reportError } from '@/lib/observability';
+import { verifyWhatsAppSignature } from '@/lib/whatsapp/webhook-signature';
 
 /**
  * WhatsApp Business (Meta Cloud API) inbound webhook (INBOX_SPEC; CTO integrations posture — WhatsApp via Meta
@@ -45,9 +46,15 @@ function messageText(m: WaMessage): string {
 }
 
 export async function POST(req: Request) {
+  const rawBody = await req.text();
+  // The webhook has no session; the HMAC over the raw body is the authentication.
+  if (!verifyWhatsAppSignature(rawBody, req.headers.get('x-hub-signature-256'))) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+  }
+
   let payload: WaPayload;
   try {
-    payload = (await req.json()) as WaPayload;
+    payload = JSON.parse(rawBody) as WaPayload;
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }

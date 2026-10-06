@@ -7,6 +7,7 @@ import { complianceStatus, COMPLIANCE_CATEGORY_LABELS, type ComplianceStatus } f
 import { DataTable, type DataTableColumn } from '@/components/dashboard/data-table';
 import { Badge, statusTone } from '@/components/dashboard/badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
+import { ComplianceFiles } from './compliance-files';
 import type { ComplianceItem } from '@prisma/client';
 
 const STATUS_LABELS: Record<ComplianceStatus, string> = {
@@ -70,11 +71,14 @@ export function ComplianceList({ items, canWrite }: { items: ComplianceItem[]; c
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      rows={items}
-      rowKey={(item) => item.id}
-      empty={<EmptyState icon={ShieldCheck} title="No compliance items tracked yet" description="Add licenses, certificates, and registrations to track their renewal dates." />}
-    />
+    <>
+      <DataTable
+        columns={columns}
+        rows={items}
+        rowKey={(item) => item.id}
+        empty={<EmptyState icon={ShieldCheck} title="No compliance items tracked yet" description="Add licenses, certificates, and registrations to track their renewal dates." />}
+      />
+      <ComplianceFiles items={items} canWrite={canWrite} />
+    </>
   );
 }

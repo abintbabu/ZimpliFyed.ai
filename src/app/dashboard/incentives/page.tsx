@@ -10,10 +10,10 @@ import { IncentiveClaimsList } from './incentive-claims-list';
 import { NewIncentiveClaimForm } from './new-incentive-claim-form';
 
 export default async function IncentivesPage() {
-  const { tenantId, role } = await requireTenantSession();
+  const { role } = await requireTenantSession();
   if (!hasPermission(role, 'incentives:read')) redirect('/dashboard');
 
-  const [claims, orders] = await Promise.all([listIncentiveClaims(tenantId), listOrders(tenantId)]);
+  const [claims, orders] = await Promise.all([listIncentiveClaims(), listOrders()]);
   const canWrite = hasPermission(role, 'incentives:write');
 
   const claimableTotal = claims.filter((c) => c.status === 'claimable').reduce((sum, c) => sum + c.amount, 0);
